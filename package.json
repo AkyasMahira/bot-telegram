@@ -1,0 +1,29 @@
+{
+  "name": "telegram-patient-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for patient data collection integrated with Google Sheets",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "patient",
+    "google-sheets"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "googleapis": "^144.0.0",
+    "node-telegram-bot-api": "^0.67.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "fast-check": "^3.22.0",
+    "jest": "^29.7.0"
+  }
+}
