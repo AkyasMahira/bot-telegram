@@ -3,7 +3,7 @@
  * Defines patient data fields, bot messages, and callback data constants
  */
 
-// Patient data fields - basic info (collected once per patient)
+// Patient data fields
 const PATIENT_FIELDS = [
   { key: "namaPasien", label: "Nama Pasien" },
   { key: "nik", label: "NIK / No. RM" },
@@ -18,7 +18,7 @@ const PATIENT_FIELDS = [
   { key: "dokterPemeriksa", label: "Dokter Pemeriksa" },
 ];
 
-// Teeth data fields - collected per tooth (can be multiple)
+// Teeth data fields
 const TEETH_FIELDS = [
   { key: "gigiDikeluhkan", label: "Gigi yang Dikeluhkan" },
   { key: "kondisiGigi", label: "Kondisi Gigi", type: "dropdown" },
@@ -28,10 +28,8 @@ const TEETH_FIELDS = [
     type: "dropdown",
     conditional: true,
   },
-
   { key: "diagnosa", label: "Diagnosa" },
   { key: "tindakan", label: "Tindakan", type: "dropdown" },
-
   {
     key: "rekomendasiPerawatan",
     label: "Rekomendasi Perawatan",
@@ -39,8 +37,9 @@ const TEETH_FIELDS = [
   },
 ];
 
-// Examination fields - collected once after all teeth data
+// Examination fields - Updated with new questions 23-33
 const EXAMINATION_FIELDS = [
+  // --- Existing Fields (Urutan Depan) ---
   { key: "oklusi", label: "Oklusi", type: "dropdown" },
   { key: "torusPalatinus", label: "Torus Palatinus", type: "dropdown" },
   { key: "torusMandibularis", label: "Torus Mandibularis", type: "dropdown" },
@@ -48,15 +47,50 @@ const EXAMINATION_FIELDS = [
   { key: "diastema", label: "Diastema" },
   { key: "gigiAnomali", label: "Gigi Anomali" },
   { key: "skorD", label: "D (Decay)" },
-  { key: "skorM", label: "M (Missin)" },
+  { key: "skorM", label: "M (Missing)" },
   { key: "skorF", label: "F (Filled)" },
   { key: "skorDMF", label: "Skor DMF" },
+
+  // --- NEW FIELDS (Urutan Belakang - Masuk ke Kolom AF keatas) ---
+  { key: "faseGeligi", label: "Fase Geligi Campuran", type: "yes_no" }, // No 23
+  {
+    key: "molarErupsi",
+    label: "4 Molar Permanen RA-RB Sudah Erupsi Sempurna",
+    type: "yes_no",
+  }, // No 24a
+  {
+    key: "insisifErupsi",
+    label: "4 Insisif Permanen RA-RB Sudah Erupsi Sempurna",
+    type: "yes_no",
+  }, // No 24b
+  {
+    key: "relasiMolarKanan",
+    label: "Relasi Molar Kanan Neutroklasi",
+    type: "yes_no",
+  }, // No 25a
+  {
+    key: "relasiMolarKiri",
+    label: "Relasi Molar Kiri Neutroklasi",
+    type: "yes_no",
+  }, // No 25b
+  {
+    key: "kasusSederhana",
+    label: "Kasus Sederhana (Dental bukan Skeletal)",
+    type: "yes_no",
+  }, // No 26a
+  { key: "diastemaMultipel", label: "Diastema Multipel", type: "yes_no" }, // No 26b
+  { key: "kondisiGigigeligi", label: "Kondisi Gigigeligi", type: "dropdown" }, // No 27
+  { key: "lainLain", label: "Lain-Lain / Catatan" }, // No 31
+  {
+    key: "rekomendasiUtama",
+    label: "Rekomendasi Perawatan Utama",
+    type: "dropdown",
+  }, // No 32
+  { key: "dokterPJ", label: "Dokter Gigi Penanggung Jawab Lapangan" }, // No 33
 ];
 
-// All fields combined for summary display
 const ALL_FIELDS = [...PATIENT_FIELDS, ...TEETH_FIELDS, ...EXAMINATION_FIELDS];
 
-// Bot messages
 const MESSAGES = {
   ASK_DOCTOR_NAME: "Masukkan Nama Dokter Pemeriksa",
   WELCOME:
@@ -78,6 +112,8 @@ const MESSAGES = {
   ERROR_NO_ACTIVE_SESSION: "Tidak ada sesi aktif. Ketik /start untuk memulai.",
   ERROR_ALREADY_HAS_SESSION:
     "Anda sudah memiliki sesi aktif. Selesaikan atau gunakan /exit untuk membatalkan.",
+
+  // Instructions
   SELECT_FIELD_TO_EDIT: "Pilih field yang ingin diubah:",
   SELECT_LETAK_KARIES: "Pilih Letak Karies:",
   SELECT_KONDISI_GIGI: "Pilih Kondisi Gigi:",
@@ -88,7 +124,6 @@ const MESSAGES = {
   SELECT_PALATUM: "Pilih Palatum:",
 };
 
-// Callback data constants for inline keyboards
 const CALLBACK_DATA = {
   CONFIRM_YES: "confirm_yes",
   CONFIRM_NO: "confirm_no",
@@ -98,6 +133,8 @@ const CALLBACK_DATA = {
   EDIT_FIELD_PREFIX: "edit_",
   EDIT_BACK: "edit_back",
   KARIES_PREFIX: "karies_",
+
+  // Field Prefixes
   FIELD_KARIES_PREFIX: "field_karies_",
   FIELD_KONDISI_PREFIX: "field_kondisi_",
   FIELD_REKOMENDASI_PREFIX: "field_rekom_",
@@ -106,25 +143,35 @@ const CALLBACK_DATA = {
   FIELD_TORUS_M_PREFIX: "field_torusm_",
   FIELD_PALATUM_PREFIX: "field_palatum_",
   FIELD_JENIS_KELAMIN_PREFIX: "field_jk_",
-  FIELD_TINDAKAN_PREFIX: "field_tindakan_", // <-- BARU
+  FIELD_TINDAKAN_PREFIX: "field_tindakan_",
+
+  // NEW PREFIXES
+  FIELD_YN_PREFIX: "field_yn_", // Generic Yes/No
+  FIELD_KONDISI_GELIGI_PREFIX: "field_kgeligi_",
+  FIELD_REKOM_UTAMA_PREFIX: "field_rutama_",
+
   ADD_TEETH_YES: "add_teeth_yes",
   ADD_TEETH_NO: "add_teeth_no",
 };
 
-// Jenis Kelamin
+// --- OPTIONS LISTS ---
+
 const JENIS_KELAMIN_TYPES = [
   { key: "LAKI-LAKI", label: "LAKI-LAKI" },
   { key: "PEREMPUAN", label: "PEREMPUAN" },
 ];
 
-// Oklusi options
+const YES_NO_TYPES = [
+  { key: "Ya", label: "Ya" },
+  { key: "Tidak", label: "Tidak" },
+];
+
 const OKLUSI_TYPES = [
   { key: "normal_bite", label: "Normal Bite" },
   { key: "cross_bite", label: "Cross Bite" },
   { key: "steep_bite", label: "Steep Bite" },
 ];
 
-// Torus Palatinus options
 const TORUS_PALATINUS_TYPES = [
   { key: "tidak_ada", label: "Tidak Ada" },
   { key: "kecil", label: "Kecil" },
@@ -133,7 +180,6 @@ const TORUS_PALATINUS_TYPES = [
   { key: "multiple", label: "Multiple" },
 ];
 
-// Torus Mandibularis options
 const TORUS_MANDIBULARIS_TYPES = [
   { key: "tidak_ada", label: "Tidak Ada" },
   { key: "kiri", label: "Kiri" },
@@ -141,14 +187,12 @@ const TORUS_MANDIBULARIS_TYPES = [
   { key: "kedua_sisi", label: "Kedua Sisi" },
 ];
 
-// Palatum options
 const PALATUM_TYPES = [
   { key: "dalam", label: "Dalam" },
   { key: "sedang", label: "Sedang" },
   { key: "rendah", label: "Rendah" },
 ];
 
-// Kondisi Gigi options
 const KONDISI_GIGI_TYPES = [
   {
     key: "Fraktur Gigi",
@@ -192,15 +236,9 @@ const KONDISI_GIGI_TYPES = [
     imageUrl:
       "https://drive.google.com/uc?id=1MaUQssH6QWnEoOAL3IOiDQZrmQOaMci4",
   },
-  {
-    key: "karies",
-    label: "Karies",
-    hasKariesLocation: true,
-    imageUrl: null,
-  },
+  { key: "karies", label: "Karies", hasKariesLocation: true, imageUrl: null },
 ];
 
-// Karies types
 const KARIES_TYPES = [
   {
     key: "D",
@@ -239,7 +277,6 @@ const KARIES_TYPES = [
   },
 ];
 
-// --- OPTIONS TINDAKAN BARU ---
 const TINDAKAN_TYPES = [
   { key: "sehat", label: "Sehat" },
   { key: "penambalan", label: "Penambalan" },
@@ -249,13 +286,31 @@ const TINDAKAN_TYPES = [
   { key: "perawatan_rsgm", label: "perawatan RSGM" },
 ];
 
-// Rekomendasi Perawatan options
 const REKOMENDASI_PERAWATAN = [
   { key: "cabut", label: "Cabut gigi" },
   { key: "saluran_akar", label: "Perawatan saluran akar" },
   { key: "tambal", label: "Tambal gigi" },
   { key: "scalling", label: "Scalling" },
   { key: "odontektomi", label: "Odontektomi" },
+  { key: "dhe", label: "DHE" },
+];
+
+// --- NEW DROPDOWN TYPES ---
+
+const KONDISI_GIGIGELIGI_TYPES = [
+  { key: "berdesakan", label: "Berdesakan" },
+  { key: "gigitan_silang", label: "Gigitan Silang" },
+  { key: "protusi_anterior", label: "Protusi Anterior" },
+];
+
+const REKOMENDASI_UTAMA_TYPES = [
+  { key: "tambalan", label: "Tambalan Gigi" },
+  { key: "saluran_akar", label: "Perawatan Saluran Akar" },
+  { key: "pulpektomi", label: "Indikasi Pulpektomi" },
+  { key: "cabut", label: "Cabut Gigi" },
+  { key: "scalling", label: "Scalling" },
+  { key: "odontektomi", label: "Odontektomi" },
+  { key: "orto", label: "Indikasi Orto" },
   { key: "dhe", label: "DHE" },
 ];
 
@@ -274,5 +329,8 @@ module.exports = {
   TORUS_MANDIBULARIS_TYPES,
   PALATUM_TYPES,
   JENIS_KELAMIN_TYPES,
-  TINDAKAN_TYPES, // <-- Jangan lupa di export
+  TINDAKAN_TYPES,
+  YES_NO_TYPES, // NEW
+  KONDISI_GIGIGELIGI_TYPES, // NEW
+  REKOMENDASI_UTAMA_TYPES, // NEW
 };
