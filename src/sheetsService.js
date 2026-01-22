@@ -106,8 +106,6 @@ class SheetsService {
       const timestamp = this.getCurrentTime();
       const rows = [];
 
-      // --- DEFINISI EXCLUSION ---
-      // Field ini akan di-skip di loop utama dan dipasang manual di paling belakang
       const SPECIAL_PATIENT_FIELDS = [
         "namaWali",
         "tanggalLahir",
@@ -128,43 +126,31 @@ class SheetsService {
         "dokterPJ",
       ];
 
-      // --- TAHAP 1: Susun Data ---
       for (let i = 0; i < teethData.length; i++) {
         const tooth = teethData[i];
         const no = this.getNextNo();
-
         const rowData = [no, recordId, this.getCurrentDate(), timestamp];
 
-        // 1. Patient Fields (Standard)
         PATIENT_FIELDS.forEach((field) => {
           if (!SPECIAL_PATIENT_FIELDS.includes(field.key))
             rowData.push(patientData[field.key] || "");
         });
 
-        // 2. Teeth Fields (Standard)
         TEETH_FIELDS.forEach((field) => {
           if (!SPECIAL_TEETH_FIELDS.includes(field.key))
             rowData.push(tooth[field.key] || "");
         });
 
-        // 3. Examination Fields (Standard - Oklusi s/d DMF)
         EXAMINATION_FIELDS.forEach((field) => {
           if (!SPECIAL_EXAM_FIELDS.includes(field.key))
             rowData.push(examinationData[field.key] || "");
         });
 
-        // --- CUSTOM ORDER SECTION (AA - AP) ---
-
-        // AA - AC
         rowData.push(patientData["namaWali"] || "-");
         rowData.push(patientData["tanggalLahir"] || "-");
         rowData.push(patientData["lokasiPemeriksaan"] || "-");
-
-        // AD - AE
         rowData.push(tooth["diagnosa"] || "-");
         rowData.push(tooth["tindakan"] || "-");
-
-        // AF - AP (Examination Baru)
         rowData.push(examinationData["faseGeligi"] || "-");
         rowData.push(examinationData["molarErupsi"] || "-");
         rowData.push(examinationData["insisifErupsi"] || "-");
@@ -180,7 +166,6 @@ class SheetsService {
         rows.push(rowData);
       }
 
-      // --- TAHAP 2: Upload Data Teks ---
       const response = await this.sheets.spreadsheets.values.append({
         spreadsheetId: this.spreadsheetId,
         range: `${this.sheetName}!A:A`,
@@ -189,14 +174,12 @@ class SheetsService {
         resource: { values: rows },
       });
 
-      // --- TAHAP 3: Update Gambar ---
       const updatedRange = response.data.updates.updatedRange;
       const match = updatedRange.match(/[A-Z]+(\d+):/);
       let startRow = match ? parseInt(match[1], 10) : 0;
 
       if (startRow > 0) {
         const imageUpdates = [];
-        // Offset hanya dihitung dari field yang masuk SEBELUM Gigi
         const columnOffset =
           4 + (PATIENT_FIELDS.length - SPECIAL_PATIENT_FIELDS.length);
 
@@ -230,16 +213,19 @@ class SheetsService {
         }
 
         if (imageUpdates.length > 0) {
-          const data = imageUpdates.map((update) => ({
-            range: update.range,
-            values: update.values,
-          }));
           await this.sheets.spreadsheets.values.batchUpdate({
             spreadsheetId: this.spreadsheetId,
-            resource: { valueInputOption: "USER_ENTERED", data: data },
+            resource: {
+              valueInputOption: "USER_ENTERED",
+              data: imageUpdates.map((u) => ({
+                range: u.range,
+                values: u.values,
+              })),
+            },
           });
         }
       }
+
       return { success: true, recordId, rowsInserted: rows.length };
     } catch (error) {
       console.error("Error appending patient data to Google Sheets:", error);
@@ -256,4 +242,5 @@ class SheetsService {
     return letter;
   }
 }
+
 module.exports = SheetsService;

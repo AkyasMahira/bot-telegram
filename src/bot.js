@@ -1,8 +1,3 @@
-/**
- * Bot module for Telegram Patient Bot
- * Handles bot initialization and command handlers
- */
-
 const TelegramBot = require("node-telegram-bot-api");
 const {
   MESSAGES,
@@ -41,12 +36,12 @@ class TelegramPatientBot {
   }
 
   registerErrorHandlers() {
-    this.bot.on("polling_error", (error) => {
-      console.error("Telegram polling error:", error);
-    });
-    this.bot.on("webhook_error", (error) => {
-      console.error("Telegram webhook error:", error);
-    });
+    this.bot.on("polling_error", (error) =>
+      console.error("Telegram polling error:", error),
+    );
+    this.bot.on("webhook_error", (error) =>
+      console.error("Telegram webhook error:", error),
+    );
   }
 
   registerCommands() {
@@ -93,7 +88,7 @@ class TelegramPatientBot {
         await this.bot.sendMessage(chatId, MESSAGES.ASK_DOCTOR_NAME);
       }
     } catch (error) {
-      console.error("Error in handleStartCommand:", error);
+      console.error("Error handleStartCommand:", error);
       await this.sendErrorMessage(
         chatId,
         "Terjadi kesalahan. Silakan coba lagi.",
@@ -115,11 +110,8 @@ class TelegramPatientBot {
       this.sessionManager.createSession(userId, doctorName);
       await this.bot.sendMessage(chatId, MESSAGES.FIRST_FIELD_PROMPT);
     } catch (error) {
-      console.error("Error in handleNewPatientCommand:", error);
-      await this.sendErrorMessage(
-        chatId,
-        "Terjadi kesalahan. Silakan coba lagi.",
-      );
+      console.error("Error handleNewPatientCommand:", error);
+      await this.sendErrorMessage(chatId, "Terjadi kesalahan.");
     }
   }
 
@@ -134,11 +126,8 @@ class TelegramPatientBot {
       this.sessionManager.deleteSession(userId);
       await this.bot.sendMessage(chatId, MESSAGES.CANCELLED);
     } catch (error) {
-      console.error("Error in handleExitCommand:", error);
-      await this.sendErrorMessage(
-        chatId,
-        "Terjadi kesalahan. Silakan coba lagi.",
-      );
+      console.error("Error handleExitCommand:", error);
+      await this.sendErrorMessage(chatId, "Terjadi kesalahan.");
     }
   }
 
@@ -159,11 +148,8 @@ class TelegramPatientBot {
         },
       );
     } catch (error) {
-      console.error("Error in handleLetakKariesCommand:", error);
-      await this.sendErrorMessage(
-        chatId,
-        "Terjadi kesalahan. Silakan coba lagi.",
-      );
+      console.error("Error handleLetakKariesCommand:", error);
+      await this.sendErrorMessage(chatId, "Terjadi kesalahan.");
     }
   }
 
@@ -185,11 +171,16 @@ class TelegramPatientBot {
         await this.handleConfirmNo(chatId, userId);
       } else if (data === CALLBACK_DATA.CONFIRM_CHANGE) {
         await this.handleConfirmChange(chatId, userId);
+      } else if (data === CALLBACK_DATA.EDIT_ADD_TOOTH) {
+        // Fitur dari Code 2: Tambah gigi via menu Edit
+        await this.handleEditAddTooth(chatId, userId);
       } else if (data.startsWith(CALLBACK_DATA.EDIT_FIELD_PREFIX)) {
         await this.handleEditFieldSelection(chatId, userId, data);
       } else if (data.startsWith(CALLBACK_DATA.KARIES_PREFIX)) {
         await this.handleKariesSelection(chatId, data);
-      } else if (data.startsWith(CALLBACK_DATA.FIELD_JENIS_KELAMIN_PREFIX)) {
+      }
+      // Field Handlers
+      else if (data.startsWith(CALLBACK_DATA.FIELD_JENIS_KELAMIN_PREFIX)) {
         await this.handleJenisKelaminSelection(chatId, userId, data);
       } else if (data.startsWith(CALLBACK_DATA.FIELD_KONDISI_PREFIX)) {
         await this.handleKondisiGigiSelection(chatId, userId, data);
@@ -208,7 +199,6 @@ class TelegramPatientBot {
       } else if (data.startsWith(CALLBACK_DATA.FIELD_PALATUM_PREFIX)) {
         await this.handlePalatumSelection(chatId, userId, data);
       } else if (data.startsWith(CALLBACK_DATA.FIELD_YN_PREFIX)) {
-        // GENERIC YES/NO
         await this.handleYesNoSelection(chatId, userId, data);
       } else if (data.startsWith(CALLBACK_DATA.FIELD_KONDISI_GELIGI_PREFIX)) {
         await this.handleKondisiGigigeligiSelection(chatId, userId, data);
@@ -220,17 +210,12 @@ class TelegramPatientBot {
         await this.handleAddMoreTeethNo(chatId, userId);
       }
     } catch (error) {
-      console.error("Error in handleCallbackQuery:", error);
-      await this.sendErrorMessage(
-        chatId,
-        "Terjadi kesalahan. Silakan coba lagi.",
-      );
+      console.error("Error handleCallbackQuery:", error);
+      await this.sendErrorMessage(chatId, "Terjadi kesalahan.");
     } finally {
       try {
         await this.bot.answerCallbackQuery(query.id);
-      } catch (e) {
-        console.error("Failed to answer callback query:", e);
-      }
+      } catch (e) {}
     }
   }
 
@@ -262,7 +247,11 @@ class TelegramPatientBot {
         await this.handlePatientFieldInput(chatId, userId, session, msg.text);
         return;
       }
-      if (session.state === "collecting_teeth") {
+      // Gabungan: handle collecting normal dan adding tooth dari edit
+      if (
+        session.state === "collecting_teeth" ||
+        session.state === "adding_tooth_from_edit"
+      ) {
         await this.handleTeethFieldInput(chatId, userId, session, msg.text);
         return;
       }
@@ -276,11 +265,8 @@ class TelegramPatientBot {
         return;
       }
     } catch (error) {
-      console.error("Error in handleMessage:", error);
-      await this.sendErrorMessage(
-        chatId,
-        "Terjadi kesalahan. Silakan coba lagi.",
-      );
+      console.error("Error handleMessage:", error);
+      await this.sendErrorMessage(chatId, "Terjadi kesalahan.");
     }
   }
 
@@ -330,9 +316,23 @@ class TelegramPatientBot {
   async promptNextTeethField(chatId, userId, session) {
     const currentField = TEETH_FIELDS[session.teethFieldIndex];
     if (!currentField) {
+      // Logic gabungan: Cek apakah sedang dalam mode tambah gigi dari menu edit
+      if (session.state === "adding_tooth_from_edit") {
+        if (
+          session.currentTooth &&
+          Object.keys(session.currentTooth).length > 0
+        ) {
+          session.teethData.push({ ...session.currentTooth });
+        }
+        session.currentTooth = {};
+        session.state = "confirming";
+        await this.showConfirmationSummary(chatId, userId);
+        return;
+      }
       await this.askAddMoreTeeth(chatId);
       return;
     }
+    // Conditional skip (e.g., Letak Karies)
     if (currentField.key === "letakKaries" && currentField.conditional) {
       const currentTooth = session.currentTooth || {};
       const kondisi = KONDISI_GIGI_TYPES.find(
@@ -379,32 +379,29 @@ class TelegramPatientBot {
       await this.showConfirmationSummary(chatId, userId);
       return;
     }
-
-    // Handle Dropdowns & Yes/No
     if (currentField.type === "yes_no") {
       await this.showYesNoDropdown(
         chatId,
         currentField.label,
         currentField.key,
       );
-    } else if (currentField.key === "oklusi") {
+    } else if (currentField.key === "oklusi")
       await this.showOklusiDropdown(chatId);
-    } else if (currentField.key === "torusPalatinus") {
+    else if (currentField.key === "torusPalatinus")
       await this.showTorusPalatinusDropdown(chatId);
-    } else if (currentField.key === "torusMandibularis") {
+    else if (currentField.key === "torusMandibularis")
       await this.showTorusMandibularisDropdown(chatId);
-    } else if (currentField.key === "palatum") {
+    else if (currentField.key === "palatum")
       await this.showPalatumDropdown(chatId);
-    } else if (currentField.key === "kondisiGigigeligi") {
+    else if (currentField.key === "kondisiGigigeligi")
       await this.showKondisiGigigeligiDropdown(chatId);
-    } else if (currentField.key === "rekomendasiUtama") {
+    else if (currentField.key === "rekomendasiUtama")
       await this.showRekomendasiUtamaDropdown(chatId);
-    } else {
+    else
       await this.bot.sendMessage(
         chatId,
         `${MESSAGES.FIELD_PROMPT_PREFIX}${currentField.label}:`,
       );
-    }
   }
 
   async handleExaminationFieldInput(chatId, userId, session, text) {
@@ -417,7 +414,7 @@ class TelegramPatientBot {
     }
   }
 
-  // ==================== DROPDOWN HELPERS ====================
+  // ==================== DROPDOWNS ====================
 
   async showJenisKelaminDropdown(chatId) {
     const keyboard = JENIS_KELAMIN_TYPES.map((j) => [
@@ -518,10 +515,7 @@ class TelegramPatientBot {
       reply_markup: { inline_keyboard: keyboard },
     });
   }
-
-  // NEW DROPDOWNS
   async showYesNoDropdown(chatId, label, fieldKey) {
-    // Format Callback: field_yn_KEY_VALUE (e.g., field_yn_faseGeligi_Ya)
     const keyboard = YES_NO_TYPES.map((yn) => [
       {
         text: yn.label,
@@ -569,52 +563,127 @@ class TelegramPatientBot {
       true,
     );
   }
+
   async handleKondisiGigiSelection(chatId, userId, data) {
     const session = this.sessionManager.getSession(userId);
     if (!session) return;
     const key = data.replace(CALLBACK_DATA.FIELD_KONDISI_PREFIX, "");
     const item = KONDISI_GIGI_TYPES.find((i) => i.key === key);
     if (!item) return;
+
+    // Logic dari Code 2: Handle perubahan saat Editing
+    if (
+      session.state === "editing" &&
+      session.editingField &&
+      session.editingField.type === "toothfield"
+    ) {
+      const { toothIndex } = session.editingField;
+      if (session.teethData[toothIndex]) {
+        session.teethData[toothIndex].kondisiGigi = item.label;
+        // Jika berubah jadi karies, tanya letak karies
+        if (item.hasKariesLocation) {
+          session.editingField.waitingForKaries = true;
+          await this.showLetakKariesDropdown(chatId);
+          return;
+        } else {
+          session.teethData[toothIndex].letakKaries = "-";
+        }
+      }
+      session.editingField = null;
+      session.state = "confirming";
+      await this.showConfirmationSummary(chatId, userId);
+      return;
+    }
+
     if (!session.currentTooth) session.currentTooth = {};
     session.currentTooth.kondisiGigi = item.label;
     session.teethFieldIndex++;
     await this.promptNextTeethField(chatId, userId, session);
   }
+
   async handleFieldKariesSelection(chatId, userId, data) {
     const session = this.sessionManager.getSession(userId);
     if (!session) return;
     const key = data.replace(CALLBACK_DATA.FIELD_KARIES_PREFIX, "");
     const item = KARIES_TYPES.find((i) => i.key === key);
     if (!item) return;
+
+    // Handle saat editing (jika sebelumnya kondisi gigi diubah jadi karies)
+    if (
+      session.state === "editing" &&
+      session.editingField &&
+      session.editingField.type === "toothfield"
+    ) {
+      const { toothIndex } = session.editingField;
+      if (session.teethData[toothIndex]) {
+        session.teethData[toothIndex].letakKaries = item.label;
+      }
+      session.editingField = null;
+      session.state = "confirming";
+      await this.showConfirmationSummary(chatId, userId);
+      return;
+    }
+
     if (!session.currentTooth) session.currentTooth = {};
     session.currentTooth.letakKaries = item.label;
     session.teethFieldIndex++;
     await this.promptNextTeethField(chatId, userId, session);
   }
+
   async handleTindakanSelection(chatId, userId, data) {
     const session = this.sessionManager.getSession(userId);
     if (!session) return;
     const key = data.replace(CALLBACK_DATA.FIELD_TINDAKAN_PREFIX, "");
     const item = TINDAKAN_TYPES.find((i) => i.key === key);
     if (!item) return;
+
+    // Support edit
+    if (
+      session.state === "editing" &&
+      session.editingField &&
+      session.editingField.type === "toothfield"
+    ) {
+      session.teethData[session.editingField.toothIndex].tindakan = item.label;
+      session.editingField = null;
+      session.state = "confirming";
+      await this.showConfirmationSummary(chatId, userId);
+      return;
+    }
+
     if (!session.currentTooth) session.currentTooth = {};
     session.currentTooth.tindakan = item.label;
     session.teethFieldIndex++;
     await this.promptNextTeethField(chatId, userId, session);
   }
+
   async handleRekomendasiSelection(chatId, userId, data) {
     const session = this.sessionManager.getSession(userId);
     if (!session) return;
     const key = data.replace(CALLBACK_DATA.FIELD_REKOMENDASI_PREFIX, "");
     const item = REKOMENDASI_PERAWATAN.find((i) => i.key === key);
     if (!item) return;
+
+    // Support edit
+    if (
+      session.state === "editing" &&
+      session.editingField &&
+      session.editingField.type === "toothfield"
+    ) {
+      session.teethData[session.editingField.toothIndex].rekomendasiPerawatan =
+        item.label;
+      session.editingField = null;
+      session.state = "confirming";
+      await this.showConfirmationSummary(chatId, userId);
+      return;
+    }
+
     if (!session.currentTooth) session.currentTooth = {};
     session.currentTooth.rekomendasiPerawatan = item.label;
     session.teethFieldIndex++;
     await this.promptNextTeethField(chatId, userId, session);
   }
 
-  // --- Examination Selections ---
+  // Generic Selection Handlers
   async handleOklusiSelection(chatId, userId, data) {
     this._handleGenericSelection(
       chatId,
@@ -659,18 +728,36 @@ class TelegramPatientBot {
       "palatum",
     );
   }
+  async handleKondisiGigigeligiSelection(chatId, userId, data) {
+    this._handleGenericSelection(
+      chatId,
+      userId,
+      data,
+      CALLBACK_DATA.FIELD_KONDISI_GELIGI_PREFIX,
+      KONDISI_GIGIGELIGI_TYPES,
+      "examinationData",
+      "kondisiGigigeligi",
+    );
+  }
+  async handleRekomendasiUtamaSelection(chatId, userId, data) {
+    this._handleGenericSelection(
+      chatId,
+      userId,
+      data,
+      CALLBACK_DATA.FIELD_REKOM_UTAMA_PREFIX,
+      REKOMENDASI_UTAMA_TYPES,
+      "examinationData",
+      "rekomendasiUtama",
+    );
+  }
 
-  // NEW HANDLERS
   async handleYesNoSelection(chatId, userId, data) {
-    // data format: field_yn_faseGeligi_Ya
     const session = this.sessionManager.getSession(userId);
     if (!session) return;
-
-    const raw = data.replace(CALLBACK_DATA.FIELD_YN_PREFIX, ""); // faseGeligi_Ya
+    const raw = data.replace(CALLBACK_DATA.FIELD_YN_PREFIX, "");
     const lastUnderscore = raw.lastIndexOf("_");
     const fieldKey = raw.substring(0, lastUnderscore);
     const valueKey = raw.substring(lastUnderscore + 1);
-
     const yn = YES_NO_TYPES.find((y) => y.key === valueKey);
     if (!yn) return;
 
@@ -686,31 +773,6 @@ class TelegramPatientBot {
     }
   }
 
-  async handleKondisiGigigeligiSelection(chatId, userId, data) {
-    this._handleGenericSelection(
-      chatId,
-      userId,
-      data,
-      CALLBACK_DATA.FIELD_KONDISI_GELIGI_PREFIX,
-      KONDISI_GIGIGELIGI_TYPES,
-      "examinationData",
-      "kondisiGigigeligi",
-    );
-  }
-
-  async handleRekomendasiUtamaSelection(chatId, userId, data) {
-    this._handleGenericSelection(
-      chatId,
-      userId,
-      data,
-      CALLBACK_DATA.FIELD_REKOM_UTAMA_PREFIX,
-      REKOMENDASI_UTAMA_TYPES,
-      "examinationData",
-      "rekomendasiUtama",
-    );
-  }
-
-  // Generic helper for simple selections
   async _handleGenericSelection(
     chatId,
     userId,
@@ -723,7 +785,6 @@ class TelegramPatientBot {
   ) {
     const session = this.sessionManager.getSession(userId);
     if (!session) return;
-
     const key = data.replace(prefix, "");
     const item = typeArray.find((t) => t.key === key);
     if (!item) return;
@@ -848,10 +909,12 @@ class TelegramPatientBot {
       await this.bot.sendMessage(chatId, MESSAGES.ERROR_SAVE_FAILED);
     }
   }
+
   async handleConfirmNo(chatId, userId) {
     this.sessionManager.deleteSession(userId);
     await this.bot.sendMessage(chatId, MESSAGES.CANCELLED);
   }
+
   async handleConfirmChange(chatId, userId) {
     const session = this.sessionManager.getSession(userId);
     if (!session) {
@@ -876,6 +939,15 @@ class TelegramPatientBot {
         },
       ]);
     });
+
+    // Fitur Code 2: Tambah Gigi via Edit Menu
+    keyboard.push([
+      {
+        text: `➕ Tambah Gigi Baru`,
+        callback_data: CALLBACK_DATA.EDIT_ADD_TOOTH,
+      },
+    ]);
+
     EXAMINATION_FIELDS.forEach((field) => {
       keyboard.push([
         {
@@ -887,6 +959,15 @@ class TelegramPatientBot {
     await this.bot.sendMessage(chatId, MESSAGES.SELECT_FIELD_TO_EDIT, {
       reply_markup: { inline_keyboard: keyboard },
     });
+  }
+
+  async handleEditAddTooth(chatId, userId) {
+    const session = this.sessionManager.getSession(userId);
+    if (!session) return;
+    session.state = "adding_tooth_from_edit";
+    session.currentTooth = {};
+    session.teethFieldIndex = 0;
+    await this.promptNextTeethField(chatId, userId, session);
   }
 
   async handleEditFieldSelection(chatId, userId, data) {
@@ -1000,6 +1081,7 @@ class TelegramPatientBot {
       await this.promptNextExaminationField(chatId, userId, session);
     else await this.showConfirmationSummary(chatId, userId);
   }
+
   async handleResumeStartNew(chatId, userId) {
     const existingSession = this.sessionManager.getSession(userId);
     const doctorName = existingSession ? existingSession.doctorName : null;
@@ -1007,6 +1089,7 @@ class TelegramPatientBot {
     this.sessionManager.createSession(userId, doctorName);
     await this.bot.sendMessage(chatId, MESSAGES.FIRST_FIELD_PROMPT);
   }
+
   async handleKariesSelection(chatId, data) {
     const key = data.replace(CALLBACK_DATA.KARIES_PREFIX, "");
     const karies = KARIES_TYPES.find((k) => k.key === key);
@@ -1027,6 +1110,7 @@ class TelegramPatientBot {
       );
     }
   }
+
   async sendErrorMessage(chatId, message) {
     try {
       await this.bot.sendMessage(chatId, message);
