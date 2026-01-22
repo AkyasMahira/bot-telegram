@@ -14,7 +14,8 @@ const {
   TORUS_PALATINUS_TYPES,
   TORUS_MANDIBULARIS_TYPES,
   PALATUM_TYPES,
-  JENIS_KELAMIN_TYPES, // <-- DITAMBAHKAN
+  JENIS_KELAMIN_TYPES,
+  TINDAKAN_TYPES, // <-- IMPORT BARU
   PATIENT_FIELDS,
   TEETH_FIELDS,
   EXAMINATION_FIELDS,
@@ -203,7 +204,7 @@ class TelegramPatientBot {
       else if (data.startsWith(CALLBACK_DATA.KARIES_PREFIX)) {
         await this.handleKariesSelection(chatId, data);
       }
-      // Field inputs - Jenis Kelamin (NEW)
+      // Field inputs - Jenis Kelamin
       else if (data.startsWith(CALLBACK_DATA.FIELD_JENIS_KELAMIN_PREFIX)) {
         await this.handleJenisKelaminSelection(chatId, userId, data);
       }
@@ -214,6 +215,10 @@ class TelegramPatientBot {
       // Field inputs - Letak Karies
       else if (data.startsWith(CALLBACK_DATA.FIELD_KARIES_PREFIX)) {
         await this.handleFieldKariesSelection(chatId, userId, data);
+      }
+      // Field inputs - Tindakan (NEW)
+      else if (data.startsWith(CALLBACK_DATA.FIELD_TINDAKAN_PREFIX)) {
+        await this.handleTindakanSelection(chatId, userId, data);
       }
       // Field inputs - Rekomendasi Perawatan
       else if (data.startsWith(CALLBACK_DATA.FIELD_REKOMENDASI_PREFIX)) {
@@ -322,18 +327,15 @@ class TelegramPatientBot {
     const currentField = PATIENT_FIELDS[session.patientFieldIndex];
 
     if (!currentField) {
-      // All patient fields done, start teeth collection
       session.state = "collecting_teeth";
       session.teethFieldIndex = 0;
       await this.promptNextTeethField(chatId, userId, session);
       return;
     }
 
-    // Hanya simpan text jika bukan dropdown (dropdown ditangani callback)
     if (currentField.type !== "dropdown") {
       session.patientData[currentField.key] = text;
       session.patientFieldIndex++;
-      // Check next field
       await this.promptNextPatientField(chatId, userId, session);
     }
   }
@@ -342,26 +344,22 @@ class TelegramPatientBot {
     const nextField = PATIENT_FIELDS[session.patientFieldIndex];
 
     if (!nextField) {
-      // All patient fields done, start teeth collection
       session.state = "collecting_teeth";
       session.teethFieldIndex = 0;
       await this.promptNextTeethField(chatId, userId, session);
       return;
     }
 
-    // Skip field if already filled (e.g., dokterPemeriksa from /start)
     if (session.patientData[nextField.key]) {
       session.patientFieldIndex++;
       await this.promptNextPatientField(chatId, userId, session);
       return;
     }
 
-    // Handle Dropdown for Jenis Kelamin (NEW LOGIC)
     if (nextField.key === "jenisKelamin" || nextField.type === "dropdown") {
       if (nextField.key === "jenisKelamin") {
         await this.showJenisKelaminDropdown(chatId);
       }
-      // Jika ada field dropdown lain di masa depan, tambahkan di sini
       return;
     }
 
@@ -377,12 +375,10 @@ class TelegramPatientBot {
     const currentField = TEETH_FIELDS[session.teethFieldIndex];
 
     if (!currentField) {
-      // All teeth fields done, ask if want to add more
       await this.askAddMoreTeeth(chatId);
       return;
     }
 
-    // Skip letakKaries if kondisi is not karies
     if (currentField.key === "letakKaries" && currentField.conditional) {
       const currentTooth = session.currentTooth || {};
       const kondisi = KONDISI_GIGI_TYPES.find(
@@ -396,11 +392,13 @@ class TelegramPatientBot {
       }
     }
 
-    // Show appropriate prompt based on field type
     if (currentField.key === "kondisiGigi") {
       await this.showKondisiGigiDropdown(chatId);
     } else if (currentField.key === "letakKaries") {
       await this.showLetakKariesDropdown(chatId);
+    } else if (currentField.key === "tindakan") {
+      // <-- HANDLE TINDAKAN DROPDOWN
+      await this.showTindakanDropdown(chatId);
     } else if (currentField.key === "rekomendasiPerawatan") {
       await this.showRekomendasiDropdown(chatId);
     } else {
@@ -416,7 +414,6 @@ class TelegramPatientBot {
 
     if (!currentField) return;
 
-    // Only handle text input for non-dropdown fields
     if (currentField.type !== "dropdown") {
       if (!session.currentTooth) session.currentTooth = {};
       session.currentTooth[currentField.key] = text;
@@ -459,6 +456,19 @@ class TelegramPatientBot {
       },
     ]);
     await this.bot.sendMessage(chatId, MESSAGES.SELECT_LETAK_KARIES, {
+      reply_markup: { inline_keyboard: keyboard },
+    });
+  }
+
+  // --- NEW: Tindakan Dropdown ---
+  async showTindakanDropdown(chatId) {
+    const keyboard = TINDAKAN_TYPES.map((t) => [
+      {
+        text: t.label,
+        callback_data: `${CALLBACK_DATA.FIELD_TINDAKAN_PREFIX}${t.key}`,
+      },
+    ]);
+    await this.bot.sendMessage(chatId, "Pilih Tindakan:", {
       reply_markup: { inline_keyboard: keyboard },
     });
   }
@@ -534,10 +544,8 @@ class TelegramPatientBot {
 
     if (!gender) return;
 
-    // Simpan ke session
     session.patientData.jenisKelamin = gender.label;
 
-    // Jika sedang dalam mode edit, langsung ke konfirmasi
     if (
       session.state === "editing" &&
       session.editingField?.key === "jenisKelamin"
@@ -546,7 +554,6 @@ class TelegramPatientBot {
       session.state = "confirming";
       await this.showConfirmationSummary(chatId, userId);
     } else {
-      // Mode normal
       session.patientFieldIndex++;
       await this.promptNextPatientField(chatId, userId, session);
     }
@@ -579,6 +586,23 @@ class TelegramPatientBot {
 
     if (!session.currentTooth) session.currentTooth = {};
     session.currentTooth.letakKaries = karies.label;
+    session.teethFieldIndex++;
+
+    await this.promptNextTeethField(chatId, userId, session);
+  }
+
+  // --- NEW: Handle Tindakan Selection ---
+  async handleTindakanSelection(chatId, userId, data) {
+    const session = this.sessionManager.getSession(userId);
+    if (!session) return;
+
+    const key = data.replace(CALLBACK_DATA.FIELD_TINDAKAN_PREFIX, "");
+    const tindakan = TINDAKAN_TYPES.find((t) => t.key === key);
+
+    if (!tindakan) return;
+
+    if (!session.currentTooth) session.currentTooth = {};
+    session.currentTooth.tindakan = tindakan.label;
     session.teethFieldIndex++;
 
     await this.promptNextTeethField(chatId, userId, session);
@@ -678,12 +702,10 @@ class TelegramPatientBot {
     const session = this.sessionManager.getSession(userId);
     if (!session) return;
 
-    // Save current tooth to teeth array
     if (session.currentTooth && Object.keys(session.currentTooth).length > 0) {
       session.teethData.push({ ...session.currentTooth });
     }
 
-    // Reset for new tooth
     session.currentTooth = {};
     session.teethFieldIndex = 0;
 
@@ -694,12 +716,10 @@ class TelegramPatientBot {
     const session = this.sessionManager.getSession(userId);
     if (!session) return;
 
-    // Save current tooth to teeth array
     if (session.currentTooth && Object.keys(session.currentTooth).length > 0) {
       session.teethData.push({ ...session.currentTooth });
     }
 
-    // Start collecting examination data
     session.state = "collecting_examination";
     session.examinationFieldIndex = 0;
     await this.promptNextExaminationField(chatId, userId, session);
@@ -711,12 +731,10 @@ class TelegramPatientBot {
     const currentField = EXAMINATION_FIELDS[session.examinationFieldIndex];
 
     if (!currentField) {
-      // All examination fields done, show confirmation
       await this.showConfirmationSummary(chatId, userId);
       return;
     }
 
-    // Show appropriate prompt based on field type
     if (currentField.key === "oklusi") {
       await this.showOklusiDropdown(chatId);
     } else if (currentField.key === "torusPalatinus") {
@@ -738,7 +756,6 @@ class TelegramPatientBot {
 
     if (!currentField) return;
 
-    // Only handle text input for non-dropdown fields
     if (currentField.type !== "dropdown") {
       session.examinationData[currentField.key] = text;
       session.examinationFieldIndex++;
@@ -754,14 +771,12 @@ class TelegramPatientBot {
 
     let summary = MESSAGES.SUMMARY_HEADER;
 
-    // Patient data
     summary += "*Data Pasien:*\n";
     PATIENT_FIELDS.forEach((field) => {
       const value = session.patientData[field.key] || "-";
       summary += `• ${field.label}: ${value}\n`;
     });
 
-    // Teeth data
     summary += "\n*Data Gigi:*\n";
     session.teethData.forEach((tooth, index) => {
       summary += `\n_Gigi ${index + 1}:_\n`;
@@ -773,7 +788,6 @@ class TelegramPatientBot {
       });
     });
 
-    // Examination data
     summary += "\n*Data Pemeriksaan:*\n";
     EXAMINATION_FIELDS.forEach((field) => {
       const value = session.examinationData[field.key] || "-";
@@ -837,11 +851,8 @@ class TelegramPatientBot {
     }
 
     session.state = "editing";
-
-    // Build keyboard with patient fields, teeth, and examination fields
     const keyboard = [];
 
-    // Patient fields
     PATIENT_FIELDS.forEach((field) => {
       keyboard.push([
         {
@@ -851,7 +862,6 @@ class TelegramPatientBot {
       ]);
     });
 
-    // Teeth entries
     session.teethData.forEach((tooth, index) => {
       keyboard.push([
         {
@@ -861,7 +871,6 @@ class TelegramPatientBot {
       ]);
     });
 
-    // Examination fields
     EXAMINATION_FIELDS.forEach((field) => {
       keyboard.push([
         {
@@ -889,7 +898,6 @@ class TelegramPatientBot {
       if (field) {
         session.editingField = { type: "patient", key };
 
-        // Handle Dropdown during Edit (NEW LOGIC)
         if (key === "jenisKelamin") {
           await this.showJenisKelaminDropdown(chatId);
         } else {
@@ -903,7 +911,6 @@ class TelegramPatientBot {
       const index = parseInt(fieldKey.replace("tooth_", ""));
       session.editingField = { type: "tooth", index };
 
-      // Show teeth fields for this tooth
       const keyboard = TEETH_FIELDS.map((field) => [
         {
           text: field.label,
@@ -936,6 +943,9 @@ class TelegramPatientBot {
             await this.showKondisiGigiDropdown(chatId);
           } else if (fieldKeyName === "letakKaries") {
             await this.showLetakKariesDropdown(chatId);
+          } else if (fieldKeyName === "tindakan") {
+            // Handle edit tindakan
+            await this.showTindakanDropdown(chatId);
           } else if (fieldKeyName === "rekomendasiPerawatan") {
             await this.showRekomendasiDropdown(chatId);
           }

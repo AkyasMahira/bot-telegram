@@ -8,13 +8,13 @@ const PATIENT_FIELDS = [
   { key: "namaPasien", label: "Nama Pasien" },
   { key: "nik", label: "NIK / No. RM" },
   { key: "jenisKelamin", label: "Jenis Kelamin", type: "dropdown" },
-  { key: "tanggalLahir", label: "Tanggal Lahir (DD-MM-YYYY)" }, 
+  { key: "tanggalLahir", label: "Tanggal Lahir (DD-MM-YYYY)" },
   { key: "usia", label: "Usia" },
   { key: "namaWali", label: "Nama Wali Pasien" },
   { key: "golonganDarah", label: "Golongan Darah" },
   { key: "alamat", label: "Alamat" },
   { key: "noTelepon", label: "No. Telepon" },
-  { key: "lokasiPemeriksaan", label: "Lokasi Pemeriksaan" }, 
+  { key: "lokasiPemeriksaan", label: "Lokasi Pemeriksaan" },
   { key: "dokterPemeriksa", label: "Dokter Pemeriksa" },
 ];
 
@@ -28,6 +28,10 @@ const TEETH_FIELDS = [
     type: "dropdown",
     conditional: true,
   },
+
+  { key: "diagnosa", label: "Diagnosa" },
+  { key: "tindakan", label: "Tindakan", type: "dropdown" },
+
   {
     key: "rekomendasiPerawatan",
     label: "Rekomendasi Perawatan",
@@ -35,7 +39,7 @@ const TEETH_FIELDS = [
   },
 ];
 
-// Examination fields - collected once after all teeth data (setelah user bilang "Tidak" untuk tambah gigi)
+// Examination fields - collected once after all teeth data
 const EXAMINATION_FIELDS = [
   { key: "oklusi", label: "Oklusi", type: "dropdown" },
   { key: "torusPalatinus", label: "Torus Palatinus", type: "dropdown" },
@@ -54,37 +58,26 @@ const ALL_FIELDS = [...PATIENT_FIELDS, ...TEETH_FIELDS, ...EXAMINATION_FIELDS];
 
 // Bot messages
 const MESSAGES = {
-  // Welcome messages
   ASK_DOCTOR_NAME: "Masukkan Nama Dokter Pemeriksa",
   WELCOME:
     "Hai dokter {name}, semangat kerjanya hari ini🤗!\nKetik /newpatient untuk memulai pendataan.",
   CONTINUE_SESSION:
     "Anda memiliki input data yang belum selesai. Ingin melanjutkan?",
-
-  // Prompts
   FIRST_FIELD_PROMPT: "Masukkan Nama Pasien:",
   FIELD_PROMPT_PREFIX: "Masukkan ",
   EDIT_FIELD_PROMPT_PREFIX: "Masukkan ",
   EDIT_FIELD_PROMPT_SUFFIX: " yang baru",
-
-  // Teeth prompts
   ASK_ADD_MORE_TEETH: "Apakah ada gigi lain yang mau ditambahkan?",
-
-  // Confirmations
   SUMMARY_HEADER:
     "📋 *Ringkasan Data Pasien*\n\nSilakan periksa data berikut:\n\n",
   SUMMARY_QUESTION: "\nApakah data sudah benar?",
   SUCCESS:
     "✅ Data berhasil disimpan ke Google Sheets!\n\nKetik /start untuk memulai ulang pencatatan.",
   CANCELLED: "❌ Input data dibatalkan. Data tidak disimpan.",
-
-  // Errors
   ERROR_SAVE_FAILED: "Data gagal di simpan di google sheets",
   ERROR_NO_ACTIVE_SESSION: "Tidak ada sesi aktif. Ketik /start untuk memulai.",
   ERROR_ALREADY_HAS_SESSION:
     "Anda sudah memiliki sesi aktif. Selesaikan atau gunakan /exit untuk membatalkan.",
-
-  // Instructions
   SELECT_FIELD_TO_EDIT: "Pilih field yang ingin diubah:",
   SELECT_LETAK_KARIES: "Pilih Letak Karies:",
   SELECT_KONDISI_GIGI: "Pilih Kondisi Gigi:",
@@ -97,23 +90,14 @@ const MESSAGES = {
 
 // Callback data constants for inline keyboards
 const CALLBACK_DATA = {
-  // Confirmation callbacks
   CONFIRM_YES: "confirm_yes",
   CONFIRM_NO: "confirm_no",
   CONFIRM_CHANGE: "confirm_change",
-
-  // Session resume callbacks
   RESUME_CONTINUE: "resume_continue",
   RESUME_START_NEW: "resume_start_new",
-
-  // Edit callbacks prefix
   EDIT_FIELD_PREFIX: "edit_",
   EDIT_BACK: "edit_back",
-
-  // Karies callbacks prefix (for /letak_karies command)
   KARIES_PREFIX: "karies_",
-
-  // Field input callbacks prefix
   FIELD_KARIES_PREFIX: "field_karies_",
   FIELD_KONDISI_PREFIX: "field_kondisi_",
   FIELD_REKOMENDASI_PREFIX: "field_rekom_",
@@ -121,9 +105,8 @@ const CALLBACK_DATA = {
   FIELD_TORUS_P_PREFIX: "field_torusp_",
   FIELD_TORUS_M_PREFIX: "field_torusm_",
   FIELD_PALATUM_PREFIX: "field_palatum_",
-  FIELD_JENIS_KELAMIN_PREFIX: "field_jk_", // NEW: Added prefix for Gender
-
-  // Add more teeth callbacks
+  FIELD_JENIS_KELAMIN_PREFIX: "field_jk_",
+  FIELD_TINDAKAN_PREFIX: "field_tindakan_", // <-- BARU
   ADD_TEETH_YES: "add_teeth_yes",
   ADD_TEETH_NO: "add_teeth_no",
 };
@@ -165,7 +148,7 @@ const PALATUM_TYPES = [
   { key: "rendah", label: "Rendah" },
 ];
 
-// Kondisi Gigi options (will show images in Google Sheets)
+// Kondisi Gigi options
 const KONDISI_GIGI_TYPES = [
   {
     key: "Fraktur Gigi",
@@ -213,11 +196,11 @@ const KONDISI_GIGI_TYPES = [
     key: "karies",
     label: "Karies",
     hasKariesLocation: true,
-    imageUrl: null, // Karies uses letak karies image instead
+    imageUrl: null,
   },
 ];
 
-// Karies types with their image file paths
+// Karies types
 const KARIES_TYPES = [
   {
     key: "D",
@@ -256,6 +239,16 @@ const KARIES_TYPES = [
   },
 ];
 
+// --- OPTIONS TINDAKAN BARU ---
+const TINDAKAN_TYPES = [
+  { key: "sehat", label: "Sehat" },
+  { key: "penambalan", label: "Penambalan" },
+  { key: "pencabutan", label: "Pencabutan" },
+  { key: "scaling", label: "Scaling" },
+  { key: "rujuk_spesialis", label: "Rujuk Spesialis" },
+  { key: "perawatan_rsgm", label: "perawatan RSGM" },
+];
+
 // Rekomendasi Perawatan options
 const REKOMENDASI_PERAWATAN = [
   { key: "cabut", label: "Cabut gigi" },
@@ -280,5 +273,6 @@ module.exports = {
   TORUS_PALATINUS_TYPES,
   TORUS_MANDIBULARIS_TYPES,
   PALATUM_TYPES,
-  JENIS_KELAMIN_TYPES, // NEW: Added to export
+  JENIS_KELAMIN_TYPES,
+  TINDAKAN_TYPES, // <-- Jangan lupa di export
 };

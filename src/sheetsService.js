@@ -18,8 +18,7 @@ class SheetsService {
     this.credentialsPath = credentialsPath;
     this.sheets = null;
     this.noCounter = 0;
-    // Nama sheet tujuan (Pastikan di Google Sheets namanya persis "Database")
-    this.sheetName = "Database";
+    this.sheetName = "Database"; // Pastikan nama sheet di Google Sheets "Database"
     this.initializationPromise = this._initialize();
   }
 
@@ -42,15 +41,14 @@ class SheetsService {
 
   async _initializeCounters() {
     try {
-      // BACA DARI SHEET 'Database'
+      // Baca kolom A dari sheet Database untuk counter
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.sheetName}!A:A`, // Baca kolom A di sheet Database
+        range: `${this.sheetName}!A:A`,
       });
 
       const rows = response.data.values;
       if (rows && rows.length > 1) {
-        // Get last No (column A)
         const lastNo = parseInt(rows[rows.length - 1][0], 10);
         if (!isNaN(lastNo)) {
           this.noCounter = lastNo;
@@ -111,54 +109,65 @@ class SheetsService {
   async appendPatientData(patientData, teethData, examinationData = {}) {
     try {
       await this.initializationPromise;
-
-      // Refresh counter dari sheet Database agar urutan update
       await this._initializeCounters();
 
       const recordId = this.generateRecordId();
       const timestamp = this.getCurrentTime();
       const rows = [];
 
-      // Field yang dipindah ke belakang (Kolom AA, AB, AC)
-      const SPECIAL_FIELDS = ["namaWali", "tanggalLahir", "lokasiPemeriksaan"];
+      // CONFIGURATION: Field mana yang mau dipindah posisinya ke belakang
+      const SPECIAL_PATIENT_FIELDS = [
+        "namaWali",
+        "tanggalLahir",
+        "lokasiPemeriksaan",
+      ];
+      // Diagnosa & Tindakan juga dipindah ke paling belakang (setelah Lokasi)
+      const SPECIAL_TEETH_FIELDS = ["diagnosa", "tindakan"];
 
       // --- TAHAP 1: Susun Data ---
       for (let i = 0; i < teethData.length; i++) {
         const tooth = teethData[i];
         const no = this.getNextNo();
 
-        // 1. Metadata
+        // 1. Metadata (A-D)
         const rowData = [no, recordId, this.getCurrentDate(), timestamp];
 
-        // 2. Patient Fields (Kecuali Special)
+        // 2. Patient Fields (Isi E-..., lewati yang Special)
         PATIENT_FIELDS.forEach((field) => {
-          if (!SPECIAL_FIELDS.includes(field.key)) {
+          if (!SPECIAL_PATIENT_FIELDS.includes(field.key)) {
             rowData.push(patientData[field.key] || "");
           }
         });
 
-        // 3. Teeth Fields
+        // 3. Teeth Fields (Isi kolom tengah, lewati Diagnosa & Tindakan)
         TEETH_FIELDS.forEach((field) => {
-          rowData.push(tooth[field.key] || "");
+          // Kita skip diagnosa & tindakan disini agar tidak "nyelip" di tengah
+          if (!SPECIAL_TEETH_FIELDS.includes(field.key)) {
+            rowData.push(tooth[field.key] || "");
+          }
         });
 
-        // 4. Examination Fields
+        // 4. Examination Fields (Isi kolom selanjutnya)
         EXAMINATION_FIELDS.forEach((field) => {
           rowData.push(examinationData[field.key] || "");
         });
 
-        // 5. Custom Fields di Belakang (Urutan: AA, AB, AC)
+        // 5. Custom Patient Fields (Taruh di Belakang: AA, AB, AC)
         rowData.push(patientData["namaWali"] || "-");
         rowData.push(patientData["tanggalLahir"] || "-");
         rowData.push(patientData["lokasiPemeriksaan"] || "-");
 
+        // 6. Custom Teeth Fields (Taruh Paling Belakang: AD, AE)
+        rowData.push(tooth["diagnosa"] || "-"); // Masuk setelah Lokasi Pemeriksaan
+        rowData.push(tooth["tindakan"] || "-"); // Masuk setelah Diagnosa
+
         rows.push(rowData);
       }
 
-      // --- TAHAP 2: Upload Data Teks ke Sheet 'Database' ---
+      // --- TAHAP 2: Upload Data Teks ---
       const response = await this.sheets.spreadsheets.values.append({
         spreadsheetId: this.spreadsheetId,
-        range: `${this.sheetName}!A:A`, // Target sheet 'Database'
+        range: `${this.sheetName}!A:A`,
         valueInputOption: "USER_ENTERED",
         insertDataOption: "INSERT_ROWS",
         resource: { values: rows },
@@ -171,10 +180,11 @@ class SheetsService {
 
       if (startRow > 0) {
         const imageUpdates = [];
-        // Hitung Offset Kolom untuk Gambar
-        // 4 (Meta) + (Total Field Pasien - 3 Special)
+
+        // Hitung Offset Kolom
+        // 4 Metadata + (Total Patient Fields - 3 Special Patient Fields)
         const columnOffset =
-          4 + (PATIENT_FIELDS.length - SPECIAL_FIELDS.length);
+          4 + (PATIENT_FIELDS.length - SPECIAL_PATIENT_FIELDS.length);
 
         for (let i = 0; i < teethData.length; i++) {
           const tooth = teethData[i];
@@ -185,6 +195,9 @@ class SheetsService {
             tooth.kondisiGigi,
           );
           if (kondisiImageUrl) {
+            // Kita cari index originalnya di array TEETH_FIELDS
+            // Karena 'diagnosa' dan 'tindakan' ada SETELAH 'kondisiGigi' dan 'letakKaries' di constants.js,
+            // maka urutan index untuk gambar AMAN (tidak bergeser).
             const colIndex =
               columnOffset +
               TEETH_FIELDS.findIndex((f) => f.key === "kondisiGigi");
