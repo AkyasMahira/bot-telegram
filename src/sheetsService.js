@@ -18,7 +18,7 @@ class SheetsService {
     this.credentialsPath = credentialsPath;
     this.sheets = null;
     this.noCounter = 0;
-    this.sheetName = "Database"; // Pastikan nama sheet di Google Sheets "Database"
+    this.sheetName = "Database";
     this.initializationPromise = this._initialize();
   }
 
@@ -28,10 +28,8 @@ class SheetsService {
         keyFile: this.credentialsPath,
         scopes: ["https://www.googleapis.com/auth/spreadsheets"],
       });
-
       const authClient = await auth.getClient();
       this.sheets = google.sheets({ version: "v4", auth: authClient });
-
       await this._initializeCounters();
     } catch (error) {
       console.error("Failed to initialize Google Sheets API:", error);
@@ -41,18 +39,14 @@ class SheetsService {
 
   async _initializeCounters() {
     try {
-      // Baca kolom A dari sheet Database untuk counter
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: `${this.sheetName}!A:A`,
       });
-
       const rows = response.data.values;
       if (rows && rows.length > 1) {
         const lastNo = parseInt(rows[rows.length - 1][0], 10);
-        if (!isNaN(lastNo)) {
-          this.noCounter = lastNo;
-        }
+        if (!isNaN(lastNo)) this.noCounter = lastNo;
       }
     } catch (error) {
       console.log("Starting counters from 0 (or sheet not found)");
@@ -103,9 +97,6 @@ class SheetsService {
     return karies ? karies.imageUrl : null;
   }
 
-  /**
-   * Append patient data to Google Spreadsheet (Sheet: Database)
-   */
   async appendPatientData(patientData, teethData, examinationData = {}) {
     try {
       await this.initializationPromise;
@@ -115,51 +106,76 @@ class SheetsService {
       const timestamp = this.getCurrentTime();
       const rows = [];
 
-      // CONFIGURATION: Field mana yang mau dipindah posisinya ke belakang
+      // --- DEFINISI EXCLUSION ---
+      // Field ini akan di-skip di loop utama dan dipasang manual di paling belakang
       const SPECIAL_PATIENT_FIELDS = [
         "namaWali",
         "tanggalLahir",
         "lokasiPemeriksaan",
       ];
-      // Diagnosa & Tindakan juga dipindah ke paling belakang (setelah Lokasi)
       const SPECIAL_TEETH_FIELDS = ["diagnosa", "tindakan"];
+      const SPECIAL_EXAM_FIELDS = [
+        "faseGeligi",
+        "molarErupsi",
+        "insisifErupsi",
+        "relasiMolarKanan",
+        "relasiMolarKiri",
+        "kasusSederhana",
+        "diastemaMultipel",
+        "kondisiGigigeligi",
+        "lainLain",
+        "rekomendasiUtama",
+        "dokterPJ",
+      ];
 
       // --- TAHAP 1: Susun Data ---
       for (let i = 0; i < teethData.length; i++) {
         const tooth = teethData[i];
         const no = this.getNextNo();
 
-        // 1. Metadata (A-D)
         const rowData = [no, recordId, this.getCurrentDate(), timestamp];
 
-        // 2. Patient Fields (Isi E-..., lewati yang Special)
+        // 1. Patient Fields (Standard)
         PATIENT_FIELDS.forEach((field) => {
-          if (!SPECIAL_PATIENT_FIELDS.includes(field.key)) {
+          if (!SPECIAL_PATIENT_FIELDS.includes(field.key))
             rowData.push(patientData[field.key] || "");
-          }
         });
 
-        // 3. Teeth Fields (Isi kolom tengah, lewati Diagnosa & Tindakan)
+        // 2. Teeth Fields (Standard)
         TEETH_FIELDS.forEach((field) => {
-          // Kita skip diagnosa & tindakan disini agar tidak "nyelip" di tengah
-          if (!SPECIAL_TEETH_FIELDS.includes(field.key)) {
+          if (!SPECIAL_TEETH_FIELDS.includes(field.key))
             rowData.push(tooth[field.key] || "");
-          }
         });
 
-        // 4. Examination Fields (Isi kolom selanjutnya)
+        // 3. Examination Fields (Standard - Oklusi s/d DMF)
         EXAMINATION_FIELDS.forEach((field) => {
-          rowData.push(examinationData[field.key] || "");
+          if (!SPECIAL_EXAM_FIELDS.includes(field.key))
+            rowData.push(examinationData[field.key] || "");
         });
 
-        // 5. Custom Patient Fields (Taruh di Belakang: AA, AB, AC)
+        // --- CUSTOM ORDER SECTION (AA - AP) ---
+
+        // AA - AC
         rowData.push(patientData["namaWali"] || "-");
         rowData.push(patientData["tanggalLahir"] || "-");
         rowData.push(patientData["lokasiPemeriksaan"] || "-");
 
-        // 6. Custom Teeth Fields (Taruh Paling Belakang: AD, AE)
-        rowData.push(tooth["diagnosa"] || "-"); // Masuk setelah Lokasi Pemeriksaan
-        rowData.push(tooth["tindakan"] || "-"); // Masuk setelah Diagnosa
+        // AD - AE
+        rowData.push(tooth["diagnosa"] || "-");
+        rowData.push(tooth["tindakan"] || "-");
+
+        // AF - AP (Examination Baru)
+        rowData.push(examinationData["faseGeligi"] || "-");
+        rowData.push(examinationData["molarErupsi"] || "-");
+        rowData.push(examinationData["insisifErupsi"] || "-");
+        rowData.push(examinationData["relasiMolarKanan"] || "-");
+        rowData.push(examinationData["relasiMolarKiri"] || "-");
+        rowData.push(examinationData["kasusSederhana"] || "-");
+        rowData.push(examinationData["diastemaMultipel"] || "-");
+        rowData.push(examinationData["kondisiGigigeligi"] || "-");
+        rowData.push(examinationData["lainLain"] || "-");
+        rowData.push(examinationData["rekomendasiUtama"] || "-");
+        rowData.push(examinationData["dokterPJ"] || "-");
 
         rows.push(rowData);
       }
@@ -180,9 +196,7 @@ class SheetsService {
 
       if (startRow > 0) {
         const imageUpdates = [];
-
-        // Hitung Offset Kolom
-        // 4 Metadata + (Total Patient Fields - 3 Special Patient Fields)
+        // Offset hanya dihitung dari field yang masuk SEBELUM Gigi
         const columnOffset =
           4 + (PATIENT_FIELDS.length - SPECIAL_PATIENT_FIELDS.length);
 
@@ -190,14 +204,10 @@ class SheetsService {
           const tooth = teethData[i];
           const currentRow = startRow + i;
 
-          // Gambar Kondisi Gigi
           const kondisiImageUrl = this.getKondisiGigiImageUrl(
             tooth.kondisiGigi,
           );
           if (kondisiImageUrl) {
-            // Kita cari index originalnya di array TEETH_FIELDS
-            // Karena 'diagnosa' dan 'tindakan' ada SETELAH 'kondisiGigi' dan 'letakKaries' di constants.js,
-            // maka urutan index untuk gambar AMAN (tidak bergeser).
             const colIndex =
               columnOffset +
               TEETH_FIELDS.findIndex((f) => f.key === "kondisiGigi");
@@ -207,7 +217,6 @@ class SheetsService {
             });
           }
 
-          // Gambar Letak Karies
           const kariesImageUrl = this.getLetakKariesImageUrl(tooth.letakKaries);
           if (kariesImageUrl) {
             const colIndex =
@@ -220,23 +229,17 @@ class SheetsService {
           }
         }
 
-        // Eksekusi Update Gambar
         if (imageUpdates.length > 0) {
           const data = imageUpdates.map((update) => ({
             range: update.range,
             values: update.values,
           }));
-
           await this.sheets.spreadsheets.values.batchUpdate({
             spreadsheetId: this.spreadsheetId,
-            resource: {
-              valueInputOption: "USER_ENTERED",
-              data: data,
-            },
+            resource: { valueInputOption: "USER_ENTERED", data: data },
           });
         }
       }
-
       return { success: true, recordId, rowsInserted: rows.length };
     } catch (error) {
       console.error("Error appending patient data to Google Sheets:", error);
@@ -253,5 +256,4 @@ class SheetsService {
     return letter;
   }
 }
-
 module.exports = SheetsService;
