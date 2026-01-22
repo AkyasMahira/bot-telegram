@@ -3,16 +3,23 @@
  * Handles interaction with Google Sheets API
  */
 
-const { google } = require('googleapis');
-const { PATIENT_FIELDS, TEETH_FIELDS, EXAMINATION_FIELDS, KONDISI_GIGI_TYPES, KARIES_TYPES } = require('./constants');
+const { google } = require("googleapis");
+const {
+  PATIENT_FIELDS,
+  TEETH_FIELDS,
+  EXAMINATION_FIELDS,
+  KONDISI_GIGI_TYPES,
+  KARIES_TYPES,
+} = require("./constants");
 
 class SheetsService {
   constructor(spreadsheetId, credentialsPath) {
     this.spreadsheetId = spreadsheetId;
     this.credentialsPath = credentialsPath;
     this.sheets = null;
-    this.noCounter = 0; // For auto-increment No (per row)
-    this.patientCounter = 0; // For auto-increment Record ID (per patient)
+    this.noCounter = 0;
+    // Nama sheet tujuan (Pastikan di Google Sheets namanya persis "Database")
+    this.sheetName = "Database";
     this.initializationPromise = this._initialize();
   }
 
@@ -20,24 +27,25 @@ class SheetsService {
     try {
       const auth = new google.auth.GoogleAuth({
         keyFile: this.credentialsPath,
-        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+        scopes: ["https://www.googleapis.com/auth/spreadsheets"],
       });
 
       const authClient = await auth.getClient();
-      this.sheets = google.sheets({ version: 'v4', auth: authClient });
-      
+      this.sheets = google.sheets({ version: "v4", auth: authClient });
+
       await this._initializeCounters();
     } catch (error) {
-      console.error('Failed to initialize Google Sheets API:', error);
+      console.error("Failed to initialize Google Sheets API:", error);
       throw error;
     }
   }
 
   async _initializeCounters() {
     try {
+      // BACA DARI SHEET 'Database'
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: 'A:B', // Get No and Record ID columns
+        range: `${this.sheetName}!A:A`, // Baca kolom A di sheet Database
       });
 
       const rows = response.data.values;
@@ -47,188 +55,184 @@ class SheetsService {
         if (!isNaN(lastNo)) {
           this.noCounter = lastNo;
         }
-
-        // Get last unique Record ID (column B) and extract number
-        const recordIds = rows.slice(1).map(row => row[1]).filter(Boolean);
-        if (recordIds.length > 0) {
-          const lastRecordId = recordIds[recordIds.length - 1];
-          const match = lastRecordId.match(/P-(\d+)/);
-          if (match) {
-            this.patientCounter = parseInt(match[1], 10);
-          }
-        }
       }
     } catch (error) {
-      console.log('Starting counters from 0');
+      console.log("Starting counters from 0 (or sheet not found)");
       this.noCounter = 0;
-      this.patientCounter = 0;
     }
   }
 
-  /**
-   * Get current date formatted as DD/MM/YYYY
-   */
   getCurrentDate() {
     const now = new Date();
-    const day = String(now.getDate()).padStart(2, '0');
-    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, "0");
+    const month = String(now.getMonth() + 1).padStart(2, "0");
     const year = now.getFullYear();
     return `${day}/${month}/${year}`;
   }
 
-  /**
-   * Get current time formatted as HH:mm:ss
-   */
   getCurrentTime() {
     const now = new Date();
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    const seconds = String(now.getSeconds()).padStart(2, "0");
     return `${hours}:${minutes}:${seconds}`;
   }
 
-  /**
-   * Generate Record ID based on patient counter (P-001, P-002, etc.)
-   */
   generateRecordId() {
-    this.patientCounter++;
-    return `P-${String(this.patientCounter).padStart(3, '0')}`;
+    const now = new Date();
+    const pad = (num) => String(num).padStart(2, "0");
+    const year = now.getFullYear();
+    const month = pad(now.getMonth() + 1);
+    const day = pad(now.getDate());
+    const hours = pad(now.getHours());
+    const minutes = pad(now.getMinutes());
+    const seconds = pad(now.getSeconds());
+    return `RMD-${year}${month}${day}${hours}${minutes}${seconds}`;
   }
 
-  /**
-   * Get next auto-increment No
-   */
   getNextNo() {
     this.noCounter += 1;
     return this.noCounter;
   }
 
-  /**
-   * Get image URL for kondisi gigi
-   */
   getKondisiGigiImageUrl(kondisiLabel) {
-    const kondisi = KONDISI_GIGI_TYPES.find(k => k.label === kondisiLabel);
+    const kondisi = KONDISI_GIGI_TYPES.find((k) => k.label === kondisiLabel);
     return kondisi ? kondisi.imageUrl : null;
   }
 
-  /**
-   * Get image URL for letak karies
-   */
   getLetakKariesImageUrl(kariesLabel) {
-    const karies = KARIES_TYPES.find(k => k.label === kariesLabel);
+    const karies = KARIES_TYPES.find((k) => k.label === kariesLabel);
     return karies ? karies.imageUrl : null;
   }
 
   /**
-   * Append patient data to Google Spreadsheet
-   * Creates one row per tooth entry
-   * @param {Object} patientData - Patient data object
-   * @param {Array} teethData - Array of teeth data objects
-   * @param {Object} examinationData - Examination data object
+   * Append patient data to Google Spreadsheet (Sheet: Database)
    */
   async appendPatientData(patientData, teethData, examinationData = {}) {
     try {
       await this.initializationPromise;
 
-      // Generate Record ID for this patient (same for all teeth)
+      // Refresh counter dari sheet Database agar urutan update
+      await this._initializeCounters();
+
       const recordId = this.generateRecordId();
       const timestamp = this.getCurrentTime();
       const rows = [];
-      const imageUpdates = []; // Track cells that need IMAGE formula
 
-      // Calculate starting row (current last row + 1)
-      const currentRows = await this.sheets.spreadsheets.values.get({
-        spreadsheetId: this.spreadsheetId,
-        range: 'A:A',
-      });
-      let startRow = (currentRows.data.values ? currentRows.data.values.length : 0) + 1;
+      // Field yang dipindah ke belakang (Kolom AA, AB, AC)
+      const SPECIAL_FIELDS = ["namaWali", "tanggalLahir", "lokasiPemeriksaan"];
 
-      // Create one row per tooth
+      // --- TAHAP 1: Susun Data ---
       for (let i = 0; i < teethData.length; i++) {
         const tooth = teethData[i];
         const no = this.getNextNo();
-        const rowNumber = startRow + i;
-        
-        // Build row: No, Record ID, Tanggal, Timestamp, Patient Fields..., Teeth Fields..., Examination Fields...
+
+        // 1. Metadata
         const rowData = [no, recordId, this.getCurrentDate(), timestamp];
-        
-        // Add patient data
-        PATIENT_FIELDS.forEach(field => {
-          rowData.push(patientData[field.key] || '');
-        });
-        
-        // Add teeth data (text values first, will update with images later)
-        TEETH_FIELDS.forEach(field => {
-          rowData.push(tooth[field.key] || '');
-        });
 
-        // Add examination data (same for all teeth rows)
-        EXAMINATION_FIELDS.forEach(field => {
-          rowData.push(examinationData[field.key] || '');
-        });
-
-        rows.push(rowData);
-
-        // Track image updates for kondisiGigi
-        const kondisiImageUrl = this.getKondisiGigiImageUrl(tooth.kondisiGigi);
-        if (kondisiImageUrl) {
-          // Column index: 4 (No, RecordID, Tanggal, Timestamp) + PATIENT_FIELDS.length + index of kondisiGigi in TEETH_FIELDS
-          const kondisiColIndex = 4 + PATIENT_FIELDS.length + TEETH_FIELDS.findIndex(f => f.key === 'kondisiGigi');
-          imageUpdates.push({
-            row: rowNumber,
-            col: kondisiColIndex,
-            imageUrl: kondisiImageUrl
-          });
-        }
-
-        // Track image updates for letakKaries
-        const kariesImageUrl = this.getLetakKariesImageUrl(tooth.letakKaries);
-        if (kariesImageUrl) {
-          const kariesColIndex = 4 + PATIENT_FIELDS.length + TEETH_FIELDS.findIndex(f => f.key === 'letakKaries');
-          imageUpdates.push({
-            row: rowNumber,
-            col: kariesColIndex,
-            imageUrl: kariesImageUrl
-          });
-        }
-      }
-
-      // Append all rows (text values)
-      await this.sheets.spreadsheets.values.append({
-        spreadsheetId: this.spreadsheetId,
-        range: 'A:A',
-        valueInputOption: 'RAW',
-        insertDataOption: 'INSERT_ROWS',
-        resource: {
-          values: rows
-        }
-      });
-
-      // Update cells with IMAGE formulas
-      for (const update of imageUpdates) {
-        const colLetter = this.columnIndexToLetter(update.col);
-        await this.sheets.spreadsheets.values.update({
-          spreadsheetId: this.spreadsheetId,
-          range: `${colLetter}${update.row}`,
-          valueInputOption: 'USER_ENTERED',
-          resource: {
-            values: [[`=IMAGE("${update.imageUrl}")`]]
+        // 2. Patient Fields (Kecuali Special)
+        PATIENT_FIELDS.forEach((field) => {
+          if (!SPECIAL_FIELDS.includes(field.key)) {
+            rowData.push(patientData[field.key] || "");
           }
         });
+
+        // 3. Teeth Fields
+        TEETH_FIELDS.forEach((field) => {
+          rowData.push(tooth[field.key] || "");
+        });
+
+        // 4. Examination Fields
+        EXAMINATION_FIELDS.forEach((field) => {
+          rowData.push(examinationData[field.key] || "");
+        });
+
+        // 5. Custom Fields di Belakang (Urutan: AA, AB, AC)
+        rowData.push(patientData["namaWali"] || "-");
+        rowData.push(patientData["tanggalLahir"] || "-");
+        rowData.push(patientData["lokasiPemeriksaan"] || "-");
+
+        rows.push(rowData);
+      }
+
+      // --- TAHAP 2: Upload Data Teks ke Sheet 'Database' ---
+      const response = await this.sheets.spreadsheets.values.append({
+        spreadsheetId: this.spreadsheetId,
+        range: `${this.sheetName}!A:A`, // Target sheet 'Database'
+        valueInputOption: "USER_ENTERED",
+        insertDataOption: "INSERT_ROWS",
+        resource: { values: rows },
+      });
+
+      // --- TAHAP 3: Update Gambar ---
+      const updatedRange = response.data.updates.updatedRange;
+      const match = updatedRange.match(/[A-Z]+(\d+):/);
+      let startRow = match ? parseInt(match[1], 10) : 0;
+
+      if (startRow > 0) {
+        const imageUpdates = [];
+        // Hitung Offset Kolom untuk Gambar
+        // 4 (Meta) + (Total Field Pasien - 3 Special)
+        const columnOffset =
+          4 + (PATIENT_FIELDS.length - SPECIAL_FIELDS.length);
+
+        for (let i = 0; i < teethData.length; i++) {
+          const tooth = teethData[i];
+          const currentRow = startRow + i;
+
+          // Gambar Kondisi Gigi
+          const kondisiImageUrl = this.getKondisiGigiImageUrl(
+            tooth.kondisiGigi,
+          );
+          if (kondisiImageUrl) {
+            const colIndex =
+              columnOffset +
+              TEETH_FIELDS.findIndex((f) => f.key === "kondisiGigi");
+            imageUpdates.push({
+              range: `${this.sheetName}!${this.columnIndexToLetter(colIndex)}${currentRow}`,
+              values: [[`=IMAGE("${kondisiImageUrl}")`]],
+            });
+          }
+
+          // Gambar Letak Karies
+          const kariesImageUrl = this.getLetakKariesImageUrl(tooth.letakKaries);
+          if (kariesImageUrl) {
+            const colIndex =
+              columnOffset +
+              TEETH_FIELDS.findIndex((f) => f.key === "letakKaries");
+            imageUpdates.push({
+              range: `${this.sheetName}!${this.columnIndexToLetter(colIndex)}${currentRow}`,
+              values: [[`=IMAGE("${kariesImageUrl}")`]],
+            });
+          }
+        }
+
+        // Eksekusi Update Gambar
+        if (imageUpdates.length > 0) {
+          const data = imageUpdates.map((update) => ({
+            range: update.range,
+            values: update.values,
+          }));
+
+          await this.sheets.spreadsheets.values.batchUpdate({
+            spreadsheetId: this.spreadsheetId,
+            resource: {
+              valueInputOption: "USER_ENTERED",
+              data: data,
+            },
+          });
+        }
       }
 
       return { success: true, recordId, rowsInserted: rows.length };
     } catch (error) {
-      console.error('Error appending patient data to Google Sheets:', error);
+      console.error("Error appending patient data to Google Sheets:", error);
       return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Convert column index to letter (0=A, 1=B, ..., 26=AA, etc.)
-   */
   columnIndexToLetter(index) {
-    let letter = '';
+    let letter = "";
     while (index >= 0) {
       letter = String.fromCharCode((index % 26) + 65) + letter;
       index = Math.floor(index / 26) - 1;
