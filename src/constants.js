@@ -292,17 +292,11 @@ const REKOMENDASI_PERAWATAN = [
   { key: "dhe", label: "DHE" },
 ];
 
-const KONDISI_GIGIGELIGI_TYPES = [
-  { key: "berdesakan", label: "Berdesakan" },
-  { key: "gigitan_silang", label: "Gigitan Silang" },
-  { key: "protusi_anterior", label: "Protusi Anterior" },
-];
-
 const KONDISI_GIGI_GELIGI_TYPES = [
   { key: "berdesakan", label: "Berdesakan" },
   { key: "gigitan_silang", label: "Gigitan Silang" },
   { key: "protusi_anterior", label: "Protusi Anterior" },
-  { key: "tidak_ada", label: "Tidak Ada" },
+  { key: "gigi_normal", label: "Gigi Normal" },
 ];
 
 const REKOMENDASI_UTAMA_TYPES = [

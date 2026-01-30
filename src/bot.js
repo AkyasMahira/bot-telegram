@@ -316,7 +316,6 @@ class TelegramPatientBot {
   async promptNextTeethField(chatId, userId, session) {
     const currentField = TEETH_FIELDS[session.teethFieldIndex];
     if (!currentField) {
-      // Logic gabungan: Cek apakah sedang dalam mode tambah gigi dari menu edit
       if (session.state === "adding_tooth_from_edit") {
         if (
           session.currentTooth &&
@@ -332,23 +331,8 @@ class TelegramPatientBot {
       await this.askAddMoreTeeth(chatId);
       return;
     }
-    // Conditional skip (e.g., Letak Karies)
-    if (currentField.key === "letakKaries" && currentField.conditional) {
-      const currentTooth = session.currentTooth || {};
-      const kondisi = KONDISI_GIGI_TYPES.find(
-        (k) => k.label === currentTooth.kondisiGigi,
-      );
-      if (!kondisi || !kondisi.hasKariesLocation) {
-        session.currentTooth.letakKaries = "-";
-        session.teethFieldIndex++;
-        await this.promptNextTeethField(chatId, userId, session);
-        return;
-      }
-    }
     if (currentField.key === "kondisiGigi")
       await this.showKondisiGigiDropdown(chatId);
-    else if (currentField.key === "letakKaries")
-      await this.showLetakKariesDropdown(chatId);
     else if (currentField.key === "tindakan")
       await this.showTindakanDropdown(chatId);
     else if (currentField.key === "rekomendasiPerawatan")
@@ -435,17 +419,6 @@ class TelegramPatientBot {
       },
     ]);
     await this.bot.sendMessage(chatId, MESSAGES.SELECT_KONDISI_GIGI, {
-      reply_markup: { inline_keyboard: keyboard },
-    });
-  }
-  async showLetakKariesDropdown(chatId) {
-    const keyboard = KARIES_TYPES.map((k) => [
-      {
-        text: k.label,
-        callback_data: `${CALLBACK_DATA.FIELD_KARIES_PREFIX}${k.key}`,
-      },
-    ]);
-    await this.bot.sendMessage(chatId, MESSAGES.SELECT_LETAK_KARIES, {
       reply_markup: { inline_keyboard: keyboard },
     });
   }
@@ -571,7 +544,6 @@ class TelegramPatientBot {
     const item = KONDISI_GIGI_TYPES.find((i) => i.key === key);
     if (!item) return;
 
-    // Logic dari Code 2: Handle perubahan saat Editing
     if (
       session.state === "editing" &&
       session.editingField &&
@@ -580,14 +552,6 @@ class TelegramPatientBot {
       const { toothIndex } = session.editingField;
       if (session.teethData[toothIndex]) {
         session.teethData[toothIndex].kondisiGigi = item.label;
-        // Jika berubah jadi karies, tanya letak karies
-        if (item.hasKariesLocation) {
-          session.editingField.waitingForKaries = true;
-          await this.showLetakKariesDropdown(chatId);
-          return;
-        } else {
-          session.teethData[toothIndex].letakKaries = "-";
-        }
       }
       session.editingField = null;
       session.state = "confirming";
@@ -597,35 +561,6 @@ class TelegramPatientBot {
 
     if (!session.currentTooth) session.currentTooth = {};
     session.currentTooth.kondisiGigi = item.label;
-    session.teethFieldIndex++;
-    await this.promptNextTeethField(chatId, userId, session);
-  }
-
-  async handleFieldKariesSelection(chatId, userId, data) {
-    const session = this.sessionManager.getSession(userId);
-    if (!session) return;
-    const key = data.replace(CALLBACK_DATA.FIELD_KARIES_PREFIX, "");
-    const item = KARIES_TYPES.find((i) => i.key === key);
-    if (!item) return;
-
-    // Handle saat editing (jika sebelumnya kondisi gigi diubah jadi karies)
-    if (
-      session.state === "editing" &&
-      session.editingField &&
-      session.editingField.type === "toothfield"
-    ) {
-      const { toothIndex } = session.editingField;
-      if (session.teethData[toothIndex]) {
-        session.teethData[toothIndex].letakKaries = item.label;
-      }
-      session.editingField = null;
-      session.state = "confirming";
-      await this.showConfirmationSummary(chatId, userId);
-      return;
-    }
-
-    if (!session.currentTooth) session.currentTooth = {};
-    session.currentTooth.letakKaries = item.label;
     session.teethFieldIndex++;
     await this.promptNextTeethField(chatId, userId, session);
   }
@@ -1015,8 +950,6 @@ class TelegramPatientBot {
         if (field.type === "dropdown") {
           if (fieldKeyName === "kondisiGigi")
             await this.showKondisiGigiDropdown(chatId);
-          else if (fieldKeyName === "letakKaries")
-            await this.showLetakKariesDropdown(chatId);
           else if (fieldKeyName === "tindakan")
             await this.showTindakanDropdown(chatId);
           else if (fieldKeyName === "rekomendasiPerawatan")
