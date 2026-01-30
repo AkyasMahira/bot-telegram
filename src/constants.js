@@ -19,12 +19,6 @@ const PATIENT_FIELDS = [
 const TEETH_FIELDS = [
   { key: "gigiDikeluhkan", label: "Gigi yang Dikeluhkan" },
   { key: "kondisiGigi", label: "Kondisi Gigi", type: "dropdown" },
-  {
-    key: "letakKaries",
-    label: "Letak Karies",
-    type: "dropdown",
-    conditional: true,
-  },
   { key: "diagnosa", label: "Diagnosa" },
   { key: "tindakan", label: "Tindakan", type: "dropdown" },
   {
@@ -188,46 +182,40 @@ const KONDISI_GIGI_TYPES = [
   {
     key: "Fraktur Gigi",
     label: "Fraktur",
-    hasKariesLocation: false,
     imageUrl:
       "https://drive.google.com/uc?id=1QmXiaoU7zTGYQZahJHtZCUmBh6Jf0GmW",
   },
   {
     key: "Akar Tertinggal",
     label: "Sisa Akar",
-    hasKariesLocation: false,
     imageUrl:
       "https://drive.google.com/uc?id=17pTTa1PKzwZy2AJx78yqR92Jl28E9osm",
   },
   {
     key: "Tambalan",
     label: "Tambalan",
-    hasKariesLocation: false,
     imageUrl:
       "https://drive.google.com/uc?id=1qtzqF_i2xeDgk60fpRM1fOy4YFFJYPOW",
   },
   {
     key: "Gigi Hilang (Ekstraksi)",
     label: "Gigi Hilang",
-    hasKariesLocation: false,
     imageUrl:
       "https://drive.google.com/uc?id=1Pz81FL3CEeDhcDRDbC8u00V1Qb8K0iUR",
   },
   {
     key: "Impaksi",
     label: "Impaksi",
-    hasKariesLocation: false,
     imageUrl:
       "https://drive.google.com/uc?id=1gUuWzdL73Jw1NJDXyse7RDZb4FBg10eC",
   },
   {
     key: "Sehat",
     label: "Gigi Sehat",
-    hasKariesLocation: false,
     imageUrl:
       "https://drive.google.com/uc?id=1MaUQssH6QWnEoOAL3IOiDQZrmQOaMci4",
   },
-  { key: "karies", label: "Karies", hasKariesLocation: true, imageUrl: null },
+  { key: "karies", label: "Karies", imageUrl: null },
 ];
 
 const KARIES_TYPES = [
