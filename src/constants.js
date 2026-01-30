@@ -1,9 +1,7 @@
 /**
  * Constants module for Telegram Patient Bot
- * Defines patient data fields, bot messages, and callback data constants
  */
 
-// Patient data fields
 const PATIENT_FIELDS = [
   { key: "namaPasien", label: "Nama Pasien" },
   { key: "nik", label: "NIK / No. RM" },
@@ -18,7 +16,6 @@ const PATIENT_FIELDS = [
   { key: "dokterPemeriksa", label: "Dokter Pemeriksa" },
 ];
 
-// Teeth data fields
 const TEETH_FIELDS = [
   { key: "gigiDikeluhkan", label: "Gigi yang Dikeluhkan" },
   { key: "kondisiGigi", label: "Kondisi Gigi", type: "dropdown" },
@@ -37,7 +34,6 @@ const TEETH_FIELDS = [
   },
 ];
 
-// Examination fields
 const EXAMINATION_FIELDS = [
   { key: "oklusi", label: "Oklusi", type: "dropdown" },
   { key: "torusPalatinus", label: "Torus Palatinus", type: "dropdown" },
@@ -76,7 +72,7 @@ const EXAMINATION_FIELDS = [
     type: "yes_no",
   },
   { key: "diastemaMultipel", label: "Diastema Multipel", type: "yes_no" },
-  { key: "kondisiGigigeligi", label: "Kondisi Gigigeligi", type: "dropdown" },
+  { key: "kondisiGigiGeligi", label: "Kondisi Gigi Geligi", type: "dropdown" },
   { key: "lainLain", label: "Lain-Lain / Catatan" },
   {
     key: "rekomendasiUtama",
@@ -131,7 +127,7 @@ const CALLBACK_DATA = {
   KARIES_PREFIX: "karies_",
   FIELD_KARIES_PREFIX: "field_karies_",
   FIELD_KONDISI_PREFIX: "field_kondisi_",
-  FIELD_REKOMENDASI_PREFIX: "field_rekom_",
+  FIELD_REKOM_PREFIX: "field_rekom_",
   FIELD_OKLUSI_PREFIX: "field_oklusi_",
   FIELD_TORUS_P_PREFIX: "field_torusp_",
   FIELD_TORUS_M_PREFIX: "field_torusm_",
@@ -140,10 +136,8 @@ const CALLBACK_DATA = {
   FIELD_TINDAKAN_PREFIX: "field_tindakan_",
   FIELD_YN_PREFIX: "field_yn_",
   FIELD_YA_TIDAK_PREFIX: "field_yatidak_",
-  FIELD_KONDISI_GELIGI_PREFIX: "field_kgeligi_",
-  FIELD_KONDISI_GIGIGELIGI_PREFIX: "field_kondgigi_",
+  FIELD_KONDISI_GIGI_GELIGI_PREFIX: "field_kgg_",
   FIELD_REKOM_UTAMA_PREFIX: "field_rutama_",
-  FIELD_REKOMUTAMA_PREFIX: "field_rekomutama_",
   ADD_TEETH_YES: "add_teeth_yes",
   ADD_TEETH_NO: "add_teeth_no",
 };
@@ -328,7 +322,6 @@ module.exports = {
   TINDAKAN_TYPES,
   YES_NO_TYPES,
   YA_TIDAK_OPTIONS,
-  KONDISI_GIGIGELIGI_TYPES,
   KONDISI_GIGI_GELIGI_TYPES,
   REKOMENDASI_UTAMA_TYPES,
 };
