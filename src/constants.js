@@ -4,7 +4,7 @@
 
 const PATIENT_FIELDS = [
   { key: "namaPasien", label: "Nama Pasien" },
-  { key: "nik", label: "NIK / No. RM" },
+  { key: "nik", label: "No. KTP" }, // Diubah dari NIK / No. RM
   { key: "jenisKelamin", label: "Jenis Kelamin", type: "dropdown" },
   { key: "usia", label: "Usia" },
   { key: "namaWali", label: "Nama Wali Pasien" },
@@ -38,7 +38,7 @@ const EXAMINATION_FIELDS = [
   { key: "skorD", label: "D (Decay)" },
   { key: "skorM", label: "M (Missing)" },
   { key: "skorF", label: "F (Filled)" },
-  { key: "skorDMF", label: "Skor DMF" },
+  // Skor DMF dihapus dari sini
   { key: "faseGeligi", label: "Fase Geligi Campuran", type: "yes_no" },
   {
     key: "molarErupsi",
@@ -257,7 +257,7 @@ const KARIES_TYPES = [
 ];
 
 const TINDAKAN_TYPES = [
-  { key: "sehat", label: "Sehat" },
+  { key: "dhe", label: "DHE" }, // Diubah dari Sehat
   { key: "penambalan", label: "Penambalan" },
   { key: "pencabutan", label: "Pencabutan" },
   { key: "scaling", label: "Scaling" },
