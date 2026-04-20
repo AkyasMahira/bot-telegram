@@ -4,13 +4,7 @@
  */
 
 const { google } = require("googleapis");
-const {
-  PATIENT_FIELDS,
-  TEETH_FIELDS,
-  EXAMINATION_FIELDS,
-  KONDISI_GIGI_TYPES,
-  KARIES_TYPES,
-} = require("./constants");
+const { KONDISI_GIGI_TYPES, KARIES_TYPES } = require("./constants");
 
 class SheetsService {
   constructor(spreadsheetId, credentialsPath) {
@@ -64,22 +58,14 @@ class SheetsService {
 
   getCurrentTime() {
     const now = new Date();
-    const hours = String(now.getHours()).padStart(2, "0");
-    const minutes = String(now.getMinutes()).padStart(2, "0");
-    const seconds = String(now.getSeconds()).padStart(2, "0");
-    return `${hours}:${minutes}:${seconds}`;
+    const pad = (num) => String(num).padStart(2, "0");
+    return `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
   }
 
   generateRecordId() {
     const now = new Date();
     const pad = (num) => String(num).padStart(2, "0");
-    const year = now.getFullYear();
-    const month = pad(now.getMonth() + 1);
-    const day = pad(now.getDate());
-    const hours = pad(now.getHours());
-    const minutes = pad(now.getMinutes());
-    const seconds = pad(now.getSeconds());
-    return `RMD-${year}${month}${day}${hours}${minutes}${seconds}`;
+    return `RMD-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
   }
 
   getNextNo() {
@@ -97,75 +83,124 @@ class SheetsService {
     return karies ? karies.imageUrl : null;
   }
 
+  columnIndexToLetter(index) {
+    let letter = "";
+    while (index >= 0) {
+      letter = String.fromCharCode((index % 26) + 65) + letter;
+      index = Math.floor(index / 26) - 1;
+    }
+    return letter;
+  }
+
   async appendPatientData(patientData, teethData, examinationData = {}) {
     try {
       await this.initializationPromise;
       await this._initializeCounters();
 
+      // 1. AMBIL HEADER AGAR MAPPING KOLOM DINAMIS DAN AKURAT
+      const headerResponse = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: `${this.sheetName}!A1:ZZ1`,
+      });
+
+      const rawHeaders = headerResponse.data.values[0] || [];
+      const headers = rawHeaders.map((h) => h.toString().trim());
+
       const recordId = this.generateRecordId();
       const timestamp = this.getCurrentTime();
       const rows = [];
 
-      const SPECIAL_PATIENT_FIELDS = [
-        "namaWali",
-        "tanggalLahir",
-        "lokasiPemeriksaan",
-      ];
-      const SPECIAL_TEETH_FIELDS = ["diagnosa", "tindakan"];
-      const SPECIAL_EXAM_FIELDS = [
-        "faseGeligi",
-        "molarErupsi",
-        "insisifErupsi",
-        "relasiMolarKanan",
-        "relasiMolarKiri",
-        "kasusSederhana",
-        "diastemaMultipel",
-        "kondisiGigigeligi",
-        "lainLain",
-        "rekomendasiUtama",
-        "dokterPJ",
-      ];
-
       for (let i = 0; i < teethData.length; i++) {
         const tooth = teethData[i];
         const no = this.getNextNo();
-        const rowData = [no, recordId, this.getCurrentDate(), timestamp];
 
-        PATIENT_FIELDS.forEach((field) => {
-          if (!SPECIAL_PATIENT_FIELDS.includes(field.key))
-            rowData.push(patientData[field.key] || "");
-        });
+        // Buat array kosong sepanjang jumlah header di Google Sheets
+        const rowData = new Array(headers.length).fill("-");
 
-        TEETH_FIELDS.forEach((field) => {
-          if (!SPECIAL_TEETH_FIELDS.includes(field.key))
-            rowData.push(tooth[field.key] || "");
-        });
+        // Fungsi bantu: cari nama kolom, lalu tembak datanya di posisi index tersebut
+        const setVal = (colName, value) => {
+          const idx = headers.indexOf(colName);
+          if (idx !== -1) {
+            rowData[idx] = value && value !== "" ? value : "-";
+          }
+        };
 
-        EXAMINATION_FIELDS.forEach((field) => {
-          if (!SPECIAL_EXAM_FIELDS.includes(field.key))
-            rowData.push(examinationData[field.key] || "");
-        });
+        // --- SISTEM ---
+        setVal("No", no);
+        setVal("RecordID", recordId);
+        setVal("Tanggal", this.getCurrentDate());
+        setVal("Timestamp", timestamp);
 
-        rowData.push(patientData["namaWali"] || "-");
-        rowData.push(patientData["tanggalLahir"] || "-");
-        rowData.push(patientData["lokasiPemeriksaan"] || "-");
-        rowData.push(tooth["diagnosa"] || "-");
-        rowData.push(tooth["tindakan"] || "-");
-        rowData.push(examinationData["faseGeligi"] || "-");
-        rowData.push(examinationData["molarErupsi"] || "-");
-        rowData.push(examinationData["insisifErupsi"] || "-");
-        rowData.push(examinationData["relasiMolarKanan"] || "-");
-        rowData.push(examinationData["relasiMolarKiri"] || "-");
-        rowData.push(examinationData["kasusSederhana"] || "-");
-        rowData.push(examinationData["diastemaMultipel"] || "-");
-        rowData.push(examinationData["kondisiGigigeligi"] || "-");
-        rowData.push(examinationData["lainLain"] || "-");
-        rowData.push(examinationData["rekomendasiUtama"] || "-");
-        rowData.push(examinationData["dokterPJ"] || "-");
+        // --- DATA PASIEN ---
+        setVal("Nama Pasien", patientData.namaPasien);
+        setVal("NIK / No. RM", patientData.nik);
+        setVal("Jenis Kelamin", patientData.jenisKelamin);
+        setVal("Usia", patientData.usia);
+        setVal("Golongan Darah", patientData.golonganDarah);
+        setVal("Alamat", patientData.alamat);
+        setVal("No. Telepon", patientData.noTelepon);
+        setVal("Dokter Pemeriksa", patientData.dokterPemeriksa);
+        setVal("Wali", patientData.namaWali);
+        setVal("Tanggal Lahir", patientData.tanggalLahir);
+        setVal("Lokasi Pemeriksaan", patientData.lokasiPemeriksaan);
+
+        // --- DATA GIGI ---
+        setVal("Gigi yang Dikeluhkan", tooth.gigiDikeluhkan);
+        setVal("Kondisi Gigi", tooth.kondisiGigi);
+        setVal("Letak Karies", tooth.letakKaries);
+        setVal("Diagnosa", tooth.diagnosa);
+        setVal("Tindakan", tooth.tindakan);
+        setVal("Rekomendasi perawatan", tooth.rekomendasiPerawatan);
+
+        // --- DATA PEMERIKSAAN ---
+        setVal("Oklusi", examinationData.oklusi);
+        setVal("Torus Palatinus", examinationData.torusPalatinus);
+        setVal("Torus Mandibularis", examinationData.torusMandibularis);
+        setVal("Palatum", examinationData.palatum);
+        setVal("Diastema", examinationData.diastema);
+        setVal("Gigi Anomali", examinationData.gigiAnomali);
+
+        // Handle DMF yang mungkin formatnya beda-beda
+        setVal("D", examinationData.skorD);
+        setVal("M", examinationData.skorM);
+        setVal("F", examinationData.skorF);
+        setVal("DMF", examinationData.skorD);
+        setVal("Skor DMF", examinationData.skorM);
+
+        setVal("Fase Geligi Campuran", examinationData.faseGeligi);
+        setVal(
+          "4 Molar Permanen RA-RB Sudah erupsi Sempurna",
+          examinationData.molarErupsi,
+        );
+        setVal(
+          "4 Insisif Permanen RA-RB Sudaherupsi Sempurna",
+          examinationData.insisifErupsi,
+        );
+        setVal(
+          "Relasi Molar Kanan neutroklasi",
+          examinationData.relasiMolarKanan,
+        );
+        setVal(
+          "Relasi Molar Kiri neutroklasi",
+          examinationData.relasiMolarKiri,
+        );
+        setVal(
+          "Kasus sederhana (Dental bukan Skeletal)",
+          examinationData.kasusSederhana,
+        );
+        setVal("Diastema Multipel", examinationData.diastemaMultipel);
+        setVal("Kondisi Gigigeligi", examinationData.kondisiGigiGeligi);
+        setVal("Lain-Lain / Catatan", examinationData.lainLain);
+        setVal("Rekomendasi Perawatan Utama", examinationData.rekomendasiUtama);
+        setVal(
+          "Dokter Gigi Penanggung jawab lapangan",
+          examinationData.dokterPJ,
+        );
 
         rows.push(rowData);
       }
 
+      // 2. SIMPAN KE SPREADSHEET
       const response = await this.sheets.spreadsheets.values.append({
         spreadsheetId: this.spreadsheetId,
         range: `${this.sheetName}!A:A`,
@@ -174,14 +209,22 @@ class SheetsService {
         resource: { values: rows },
       });
 
+      // 3. INJEKSI GAMBAR JIKA ADA KONDISI GIGI
       const updatedRange = response.data.updates.updatedRange;
       const match = updatedRange.match(/[A-Z]+(\d+):/);
       let startRow = match ? parseInt(match[1], 10) : 0;
 
       if (startRow > 0) {
         const imageUpdates = [];
-        const columnOffset =
-          4 + (PATIENT_FIELDS.length - SPECIAL_PATIENT_FIELDS.length);
+
+        // Cari otomatis Huruf Kolom untuk Kondisi Gigi & Karies
+        const getColLetter = (colName) => {
+          const idx = headers.indexOf(colName);
+          return idx !== -1 ? this.columnIndexToLetter(idx) : null;
+        };
+
+        const kondisiColLetter = getColLetter("Kondisi Gigi");
+        const kariesColLetter = getColLetter("Letak Karies");
 
         for (let i = 0; i < teethData.length; i++) {
           const tooth = teethData[i];
@@ -190,23 +233,17 @@ class SheetsService {
           const kondisiImageUrl = this.getKondisiGigiImageUrl(
             tooth.kondisiGigi,
           );
-          if (kondisiImageUrl) {
-            const colIndex =
-              columnOffset +
-              TEETH_FIELDS.findIndex((f) => f.key === "kondisiGigi");
+          if (kondisiImageUrl && kondisiColLetter) {
             imageUpdates.push({
-              range: `${this.sheetName}!${this.columnIndexToLetter(colIndex)}${currentRow}`,
+              range: `${this.sheetName}!${kondisiColLetter}${currentRow}`,
               values: [[`=IMAGE("${kondisiImageUrl}")`]],
             });
           }
 
           const kariesImageUrl = this.getLetakKariesImageUrl(tooth.letakKaries);
-          if (kariesImageUrl) {
-            const colIndex =
-              columnOffset +
-              TEETH_FIELDS.findIndex((f) => f.key === "letakKaries");
+          if (kariesImageUrl && kariesColLetter) {
             imageUpdates.push({
-              range: `${this.sheetName}!${this.columnIndexToLetter(colIndex)}${currentRow}`,
+              range: `${this.sheetName}!${kariesColLetter}${currentRow}`,
               values: [[`=IMAGE("${kariesImageUrl}")`]],
             });
           }
@@ -231,15 +268,6 @@ class SheetsService {
       console.error("Error appending patient data to Google Sheets:", error);
       return { success: false, error: error.message };
     }
-  }
-
-  columnIndexToLetter(index) {
-    let letter = "";
-    while (index >= 0) {
-      letter = String.fromCharCode((index % 26) + 65) + letter;
-      index = Math.floor(index / 26) - 1;
-    }
-    return letter;
   }
 }
 
