@@ -1,7 +1,7 @@
 const TelegramPatientBot = require('./bot');
 const SessionManager = require('./sessionManager');
 const SheetsService = require('./sheetsService');
-
+const axios = require('axios');
 
 async function main() {
   try {
@@ -29,7 +29,24 @@ async function main() {
     );
 
     bot.start();
-    console.log('Bot is running and listening for messages');
+    console.log('✓ Bot is running and listening for messages');
+
+    // Uptime Kuma Push Monitoring
+    const KUMA_PUSH_URL = process.env.UPTIME_KUMA_URL;
+
+    if (KUMA_PUSH_URL) {
+      console.log('✓ Uptime Kuma monitoring activated');
+
+      setInterval(async () => {
+        try {
+          await axios.get(KUMA_PUSH_URL);
+          console.log('✓ Ping sent to Uptime Kuma');
+        } catch (err) {
+          console.error('Kuma Push Error:', err.message);
+        }
+      }, 60000); // setiap 60 detik
+    }
+
     console.log('Press Ctrl+C to stop the bot');
 
   } catch (error) {

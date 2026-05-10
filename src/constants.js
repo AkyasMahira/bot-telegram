@@ -11,7 +11,7 @@ const PATIENT_FIELDS = [
   { key: "golonganDarah", label: "Golongan Darah" },
   { key: "alamat", label: "Alamat" },
   { key: "noTelepon", label: "No. Telepon" },
-  { key: "tanggalLahir", label: "Tanggal Lahir (DD-MM-YYYY)" },
+  { key: "tanggalLahir", label: "Tanggal Lahir (DD/MM/YYYY)" },
   { key: "lokasiPemeriksaan", label: "Lokasi Pemeriksaan" },
   { key: "dokterPemeriksa", label: "Dokter Pemeriksa" },
 ];
