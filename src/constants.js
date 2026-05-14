@@ -93,7 +93,7 @@ const MESSAGES = {
     "📋 *Ringkasan Data Pasien*\n\nSilakan periksa data berikut:\n\n",
   SUMMARY_QUESTION: "\nApakah data sudah benar?",
   SUCCESS:
-    "✅ Data berhasil disimpan ke Google Sheets!\n\nKetik /start untuk memulai ulang pencatatan.",
+    "✅ Data berhasil disimpan ke Google Sheets!\n\n📊 Database dapat dilihat melalui link berikut:\nhttps://docs.google.com/spreadsheets/d/1qZKVsYyUByVaKtn1dTx4pe-CFQeUS6m6Y5NraEJz250/edit?pli=1&gid=1324992921#gid=1324992921\n\n🔄 Ketik /start untuk memulai ulang pencatatan.",
   CANCELLED: "❌ Input data dibatalkan. Data tidak disimpan.",
   ERROR_SAVE_FAILED: "Data gagal di simpan di google sheets",
   ERROR_NO_ACTIVE_SESSION: "Tidak ada sesi aktif. Ketik /start untuk memulai.",
